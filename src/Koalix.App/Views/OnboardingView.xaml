@@ -1,0 +1,37 @@
+<UserControl x:Class="Koalix.App.Views.OnboardingView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:Koalix.App.Localization" xmlns:c="clr-namespace:Koalix.App.Controls"
+             FontSize="13.5">
+  <Border Width="640" Padding="38,30,38,24" CornerRadius="20" Background="{DynamicResource PopupBrush}"
+          BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1">
+    <Border.Effect><DropShadowEffect BlurRadius="44" ShadowDepth="10" Opacity="0.5" Color="{DynamicResource ShadowColor}"/></Border.Effect>
+    <DockPanel>
+      <!-- footer: progress dots + back / next / skip -->
+      <DockPanel DockPanel.Dock="Bottom" Margin="0,22,0,0">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+          <!-- the engine-install shortcut lives on the engine step; the finish label replaces next on the last one -->
+          <Button x:Name="GotoEngines" Content="{l:T Tour.GotoEngines}" Click="GotoEngines_Click" Padding="14,7" Margin="0,0,8,0" Visibility="Collapsed"/>
+          <Button x:Name="BackBtn" Content="{l:T Tour.Back}" Click="Back_Click" Padding="14,7" Margin="0,0,8,0"/>
+          <Button x:Name="NextBtn" Content="{l:T Tour.Next}" Click="Next_Click" Padding="20,7" Style="{StaticResource AccentButton}"/>
+          <!-- v0.4.23 fix: this button carries PERSIAN text — the IconButton style forces the Segoe Fluent
+               icon font, which has no Arabic glyphs, so «رد کردن» rendered as tofu squares (□□□) in the
+               bottom-left of the tour (user screenshot). GhostButton keeps the actions without the icon font. -->
+          <Button x:Name="SkipBtn" Content="{l:T Tour.Skip}" Click="Skip_Click" Style="{StaticResource GhostButton}" FontFamily="{DynamicResource UiFont}" FontSize="12.5" VerticalAlignment="Center" Margin="10,0,0,0"/>
+        </StackPanel>
+        <StackPanel x:Name="Dots" Orientation="Horizontal" VerticalAlignment="Center"/>
+      </DockPanel>
+      <!-- step counter + live visual + title + body (rebuilt per step, animated in) -->
+      <StackPanel>
+        <DockPanel Margin="0,0,0,4">
+          <Border DockPanel.Dock="Left" x:Name="StepBadge" CornerRadius="8" Padding="10,3" Background="{DynamicResource AccentSoftBrush}" VerticalAlignment="Center">
+            <TextBlock x:Name="StepBadgeText" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="12"/>
+          </Border>
+          <TextBlock Text="{l:T Main.Tagline}" Style="{StaticResource Subtle}" FontSize="11.5" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+        </DockPanel>
+        <!-- the step's animated visual: 120px of breathing, moving KOALIX -->
+        <Grid x:Name="VisualHost" Height="118" Margin="0,14,0,6"/>
+        <TextBlock x:Name="Title" FontSize="19" FontWeight="Bold" Margin="0,4,0,8" TextWrapping="Wrap"/>
+        <TextBlock x:Name="Body" Style="{StaticResource Subtle}" FontSize="13.5" LineHeight="24" TextWrapping="Wrap"/>
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

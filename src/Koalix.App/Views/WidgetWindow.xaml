@@ -1,0 +1,222 @@
+<Window x:Class="Koalix.App.Views.WidgetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Koalix.App.Localization"
+        xmlns:c="clr-namespace:Koalix.App.Controls"
+        Title="KOALIX Widget" SizeToContent="WidthAndHeight"
+        WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" ShowActivated="False"
+        AllowsTransparency="True" Background="Transparent" WindowStartupLocation="Manual"
+        FontFamily="{DynamicResource UiFont}" FontSize="11.5" Foreground="{DynamicResource TextBrush}"
+        FlowDirection="LeftToRight" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display"
+        MouseLeftButtonDown="OnDrag">
+  <!-- v0.4.38 — the floating mini widget (user: «ویجت شناور کوچک که حتما بشه تنظیمش کرد که خاموش شه یا بشه بستش»).
+       Five modes share one window; the × (shown on hover) or the right-click menu closes it, Settings turns it
+       off for good. Numbers are pre-formatted by WidgetViewModel; levels colour them through LevelBrushConverter. -->
+  <Window.Resources>
+    <Style x:Key="Cap" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="9.5"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{DynamicResource SubtleTextBrush}"/>
+      <Setter Property="TextWrapping" Value="NoWrap"/>
+    </Style>
+    <Style x:Key="Num" TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="{StaticResource LatinFont}"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="TextWrapping" Value="NoWrap"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style x:Key="Osd" TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="{DynamicResource MonoFont}"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="FontSize" Value="12.5"/>
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="TextWrapping" Value="NoWrap"/>
+      <Setter Property="Effect">
+        <Setter.Value><DropShadowEffect BlurRadius="3" ShadowDepth="1" Opacity="0.9" Color="Black"/></Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="OsdLabel" TargetType="TextBlock" BasedOn="{StaticResource Osd}">
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+      <Setter Property="Width" Value="44"/>
+    </Style>
+    <!-- a tiny load bar: track + fill -->
+    <Style x:Key="Track" TargetType="Border">
+      <Setter Property="Width" Value="54"/>
+      <Setter Property="Height" Value="5"/>
+      <Setter Property="CornerRadius" Value="2.5"/>
+      <Setter Property="Background" Value="{DynamicResource ControlBrush}"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="Margin" Value="0,0,8,0"/>
+    </Style>
+    <Style x:Key="Fill" TargetType="Border">
+      <Setter Property="Height" Value="5"/>
+      <Setter Property="CornerRadius" Value="2.5"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+      <Setter Property="Background" Value="{DynamicResource AccentGradientBrush}"/>
+    </Style>
+  </Window.Resources>
+
+  <Grid x:Name="Root" Margin="6">
+    <Border x:Name="Card" CornerRadius="14" Padding="11,9" BorderThickness="1" MinWidth="120"
+            BorderBrush="{DynamicResource StrongBorderBrush}" Background="{DynamicResource PopupBrush}">
+      <Border.Effect>
+        <DropShadowEffect x:Name="CardShadow" BlurRadius="12" ShadowDepth="1" Opacity="0.35" Color="{DynamicResource ShadowColor}"/>
+      </Border.Effect>
+      <StackPanel>
+
+        <!-- ── compact: one line ── -->
+        <StackPanel Orientation="Horizontal" Visibility="{Binding ShowCompact, Converter={StaticResource BoolToVis}}">
+          <Ellipse Width="7" Height="7" VerticalAlignment="Center" Margin="0,0,7,0"
+                   Fill="{Binding StateLevel, Converter={x:Static c:LevelBrushConverter.Instance}}"/>
+          <TextBlock Text="{Binding Ping}" Style="{StaticResource Num}" Foreground="{Binding PingLevel, Converter={x:Static c:LevelBrushConverter.Instance}}"/>
+          <TextBlock Text="&#xE896;" Style="{StaticResource Icon}" FontSize="10" Margin="10,0,3,0" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+          <TextBlock Text="{Binding Down}" Style="{StaticResource Num}" FontWeight="SemiBold"/>
+          <TextBlock Text="&#xE898;" Style="{StaticResource Icon}" FontSize="10" Margin="9,0,3,0" Foreground="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center"/>
+          <TextBlock Text="{Binding Up}" Style="{StaticResource Num}" FontWeight="SemiBold"/>
+        </StackPanel>
+
+        <!-- ── header (network / hardware / full) ── -->
+        <DockPanel Margin="0,0,22,7" Visibility="{Binding ShowHeader, Converter={StaticResource BoolToVis}}">
+          <Image Source="pack://application:,,,/KOALIX;component/Assets/koalix.png" Width="18" Height="18" RenderOptions.BitmapScalingMode="HighQuality" VerticalAlignment="Center"/>
+          <TextBlock Text="KOALIX" FontFamily="{StaticResource LatinFont}" FontWeight="Black" FontSize="11.5" Margin="6,0,8,0" VerticalAlignment="Center"
+                     Foreground="{DynamicResource AccentTextGradientBrush}"/>
+          <Ellipse Width="6" Height="6" VerticalAlignment="Center" Margin="0,0,5,0"
+                   Fill="{Binding StateLevel, Converter={x:Static c:LevelBrushConverter.Instance}}"/>
+          <TextBlock Text="{Binding StateText}" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center"
+                     TextTrimming="CharacterEllipsis" MaxWidth="130" TextWrapping="NoWrap"/>
+        </DockPanel>
+
+        <!-- ── network ── -->
+        <Grid Visibility="{Binding ShowNet, Converter={StaticResource BoolToVis}}" Margin="0,0,0,2">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" MinWidth="62"/><ColumnDefinition Width="Auto" MinWidth="78"/><ColumnDefinition Width="Auto" MinWidth="70"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+            <TextBlock Text="{Binding PingCaption}" Style="{StaticResource Cap}"/>
+            <TextBlock Text="{Binding Ping}" Style="{StaticResource Num}" FontSize="14" Foreground="{Binding PingLevel, Converter={x:Static c:LevelBrushConverter.Instance}}"/>
+          </StackPanel>
+          <StackPanel Grid.Column="1">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE896;" Style="{StaticResource Icon}" FontSize="9" Margin="0,0,3,0" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+              <TextBlock Text="{l:T Widget.Down}" Style="{StaticResource Cap}"/>
+            </StackPanel>
+            <TextBlock Text="{Binding Down}" Style="{StaticResource Num}"/>
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE898;" Style="{StaticResource Icon}" FontSize="9" Margin="0,0,3,0" Foreground="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center"/>
+              <TextBlock Text="{l:T Widget.Up}" Style="{StaticResource Cap}"/>
+            </StackPanel>
+            <TextBlock Text="{Binding Up}" Style="{StaticResource Num}"/>
+          </StackPanel>
+        </Grid>
+
+        <!-- ── hardware (Afterburner-style rows) ── -->
+        <StackPanel Visibility="{Binding ShowHw, Converter={StaticResource BoolToVis}}" Margin="0,4,0,0">
+          <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,2,0,6" Visibility="{Binding ShowNet, Converter={StaticResource BoolToVis}}"/>
+          <!-- CPU -->
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+            <TextBlock Text="CPU" Style="{StaticResource Num}" FontSize="10.5" Width="40" Foreground="{DynamicResource AccentBrush}"/>
+            <Border Style="{StaticResource Track}">
+              <Border Style="{StaticResource Fill}" Width="{Binding CpuLoadValue, Converter={x:Static c:PercentToWidth.Instance}, ConverterParameter=54}"/>
+            </Border>
+            <TextBlock Text="{Binding CpuLoad}" Style="{StaticResource Num}" Width="34"/>
+            <TextBlock Text="{Binding CpuTemp}" Style="{StaticResource Num}" Width="44" Foreground="{Binding CpuTempLevel, Converter={x:Static c:LevelBrushConverter.Instance}}"/>
+            <TextBlock Text="{Binding CpuClock}" Style="{StaticResource Num}" FontWeight="SemiBold" FontSize="10.5" Foreground="{DynamicResource SubtleTextBrush}"/>
+          </StackPanel>
+          <!-- GPU -->
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+            <TextBlock Text="GPU" Style="{StaticResource Num}" FontSize="10.5" Width="40" Foreground="{DynamicResource AccentBrush}" ToolTip="{Binding GpuName}"/>
+            <Border Style="{StaticResource Track}">
+              <Border Style="{StaticResource Fill}" Width="{Binding GpuLoadValue, Converter={x:Static c:PercentToWidth.Instance}, ConverterParameter=54}"/>
+            </Border>
+            <TextBlock Text="{Binding GpuLoad}" Style="{StaticResource Num}" Width="34"/>
+            <TextBlock Text="{Binding GpuTemp}" Style="{StaticResource Num}" Width="44" Foreground="{Binding GpuTempLevel, Converter={x:Static c:LevelBrushConverter.Instance}}"/>
+            <TextBlock Text="{l:T Widget.Hotspot}" Style="{StaticResource Cap}" VerticalAlignment="Center" Margin="0,0,3,0"/>
+            <TextBlock Text="{Binding GpuHot}" Style="{StaticResource Num}" Foreground="{Binding GpuHotLevel, Converter={x:Static c:LevelBrushConverter.Instance}}"/>
+          </StackPanel>
+          <!-- RAM / VRAM -->
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="RAM" Style="{StaticResource Num}" FontSize="10.5" Width="40" Foreground="{DynamicResource AccentBrush}"/>
+            <Border Style="{StaticResource Track}">
+              <Border Style="{StaticResource Fill}" Width="{Binding RamValue, Converter={x:Static c:PercentToWidth.Instance}, ConverterParameter=54}"/>
+            </Border>
+            <TextBlock Text="{Binding Ram}" Style="{StaticResource Num}" FontWeight="SemiBold" FontSize="11" MinWidth="78"/>
+            <TextBlock Text="{Binding Vram}" Style="{StaticResource Num}" FontWeight="SemiBold" FontSize="10.5" Foreground="{DynamicResource SubtleTextBrush}" Margin="4,0,0,0"/>
+          </StackPanel>
+          <TextBlock Text="{Binding GpuName}" Style="{StaticResource Cap}" Margin="0,5,0,0" FontFamily="{StaticResource LatinFont}">
+            <TextBlock.Visibility>
+              <Binding Path="ShowNet" Converter="{StaticResource InverseBoolToVis}"/>
+            </TextBlock.Visibility>
+          </TextBlock>
+        </StackPanel>
+
+        <!-- ── gaming OSD (MSI Afterburner look: transparent, mono, label / value columns) ── -->
+        <StackPanel Visibility="{Binding ShowOsd, Converter={StaticResource BoolToVis}}">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="GPU" Style="{StaticResource OsdLabel}"/>
+            <TextBlock Text="{Binding GpuLoad}" Style="{StaticResource Osd}" Width="44"/>
+            <TextBlock Text="{Binding GpuTemp}" Style="{StaticResource Osd}" Width="52" Foreground="{Binding GpuTempLevel, Converter={x:Static c:LevelBrushConverter.Instance}}"/>
+            <TextBlock Text="HOT " Style="{StaticResource Osd}" FontSize="10" VerticalAlignment="Center" Foreground="{DynamicResource SubtleTextBrush}"/>
+            <TextBlock Text="{Binding GpuHot}" Style="{StaticResource Osd}" Foreground="{Binding GpuHotLevel, Converter={x:Static c:LevelBrushConverter.Instance}}"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="CPU" Style="{StaticResource OsdLabel}"/>
+            <TextBlock Text="{Binding CpuLoad}" Style="{StaticResource Osd}" Width="44"/>
+            <TextBlock Text="{Binding CpuTemp}" Style="{StaticResource Osd}" Width="52" Foreground="{Binding CpuTempLevel, Converter={x:Static c:LevelBrushConverter.Instance}}"/>
+            <TextBlock Text="{Binding CpuClock}" Style="{StaticResource Osd}" FontSize="11" VerticalAlignment="Center"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="RAM" Style="{StaticResource OsdLabel}"/>
+            <TextBlock Text="{Binding Ram}" Style="{StaticResource Osd}" Margin="0,0,8,0"/>
+            <TextBlock Text="{Binding Vram}" Style="{StaticResource Osd}" FontSize="11" VerticalAlignment="Center"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Visibility="{Binding HasFps, Converter={StaticResource BoolToVis}}">
+            <TextBlock Text="FPS" Style="{StaticResource OsdLabel}"/>
+            <TextBlock Text="{Binding Fps}" Style="{StaticResource Osd}" FontSize="14"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="PING" Style="{StaticResource OsdLabel}"/>
+            <TextBlock Text="{Binding Ping}" Style="{StaticResource Osd}" Width="64" Foreground="{Binding PingLevel, Converter={x:Static c:LevelBrushConverter.Instance}}"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="NET" Style="{StaticResource OsdLabel}"/>
+            <TextBlock Style="{StaticResource Osd}" FontSize="11">
+              <Run Text="↓"/><Run Text="{Binding Down, Mode=OneWay}"/><Run Text="  ↑"/><Run Text="{Binding Up, Mode=OneWay}"/>
+            </TextBlock>
+          </StackPanel>
+        </StackPanel>
+
+        <TextBlock x:Name="Footer" Text="{Binding Footer}" FontSize="9.5" Foreground="{DynamicResource SubtleTextBrush}" Margin="0,5,0,0" MaxWidth="240"
+                   TextWrapping="Wrap" FlowDirection="{Binding Flow, Source={x:Static l:Loc.I}}">
+          <TextBlock.Style>
+            <Style TargetType="TextBlock">
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding Footer}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </TextBlock.Style>
+        </TextBlock>
+      </StackPanel>
+    </Border>
+
+    <!-- × close: visible while the pointer is over the widget -->
+    <Button x:Name="CloseX" Click="OnClose" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,4,0"
+            Cursor="Hand" Focusable="False" Opacity="0" ToolTip="{l:T Widget.Close}">
+      <Button.Template>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="bd" Width="18" Height="18" CornerRadius="9" Background="{DynamicResource ControlBrush}">
+            <TextBlock Text="&#xE711;" Style="{StaticResource Icon}" FontSize="8" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource SubtleTextBrush}"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="bd" Property="Background" Value="{DynamicResource DangerBrush}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Button.Template>
+    </Button>
+  </Grid>
+</Window>

@@ -1,0 +1,39 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Color x:Key="WindowColor">#FFF3F5FA</Color>
+    <SolidColorBrush x:Key="WindowBrush" Color="#FFF3F5FA"/>
+    <SolidColorBrush x:Key="ShellTintBrush" Color="#B3F3F5FA"/>
+    <SolidColorBrush x:Key="SidebarBrush" Color="#66FFFFFF"/>
+    <LinearGradientBrush x:Key="CardBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#D9FFFFFF" Offset="0"/>
+        <GradientStop Color="#B3FFFFFF" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="CardBorderBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#FFFFFFFF" Offset="0"/>
+        <GradientStop Color="#1F0B1020" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="CardHoverBrush" Color="#0F0B1020"/>
+    <SolidColorBrush x:Key="ControlBrush" Color="#B3FFFFFF"/>
+    <SolidColorBrush x:Key="ControlHoverBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="ControlPressedBrush" Color="#0F0B1020"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="#1F0B1020"/>
+    <SolidColorBrush x:Key="StrongBorderBrush" Color="#380B1020"/>
+    <SolidColorBrush x:Key="TextBrush" Color="#FF151A28"/>
+    <SolidColorBrush x:Key="SubtleTextBrush" Color="#FF5C6478"/>
+    <SolidColorBrush x:Key="DisabledTextBrush" Color="#FFA3A9B8"/>
+    <SolidColorBrush x:Key="InputBrush" Color="#E6FFFFFF"/>
+    <SolidColorBrush x:Key="PopupBrush" Color="#FCFFFFFF"/>
+    <SolidColorBrush x:Key="SelectionBrush" Color="#140B1020"/>
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#470B1020"/>
+    <SolidColorBrush x:Key="TrackBrush" Color="#1A0B1020"/>
+    <SolidColorBrush x:Key="SuccessBrush" Color="#FF12A960"/>
+    <SolidColorBrush x:Key="SuccessSoftBrush" Color="#2612A960"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="#FFC77A00"/>
+    <SolidColorBrush x:Key="WarningSoftBrush" Color="#26C77A00"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="#FFE5384F"/>
+    <SolidColorBrush x:Key="DangerSoftBrush" Color="#26E5384F"/>
+    <Color x:Key="SuccessColor">#FF12A960</Color>
+    <Color x:Key="DangerColor">#FFE5384F</Color>
+    <Color x:Key="ShadowColor">#FF5A6480</Color>
+    <sys:Double x:Key="AuroraOpacity" xmlns:sys="clr-namespace:System;assembly=mscorlib">0.55</sys:Double>
+</ResourceDictionary>

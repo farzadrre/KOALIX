@@ -1,0 +1,155 @@
+<UserControl x:Class="Koalix.App.Views.AboutView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="clr-namespace:Koalix.App.Localization" xmlns:c="clr-namespace:Koalix.App.Controls">
+  <!-- v0.4.38 — About: animated logo hero, version, engines, shortcuts. -->
+  <UserControl.Resources>
+    <Style x:Key="EngineRow" TargetType="Border">
+      <Setter Property="Background" Value="{DynamicResource ControlBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="{DynamicResource ControlRadius}"/>
+      <Setter Property="Padding" Value="12,9"/>
+      <Setter Property="Margin" Value="0,0,8,8"/>
+      <Setter Property="MinWidth" Value="190"/>
+    </Style>
+    <Style x:Key="Feature" TargetType="Border">
+      <Setter Property="Background" Value="{DynamicResource ControlBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="{DynamicResource ControlRadius}"/>
+      <Setter Property="Padding" Value="14,12"/>
+      <Setter Property="Margin" Value="0,0,10,10"/>
+      <Setter Property="Width" Value="220"/>
+    </Style>
+  </UserControl.Resources>
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="0,0,0,16">
+      <TextBlock Text="{l:T About.Title}" Style="{StaticResource Title}"/>
+
+      <!-- hero -->
+      <Border Style="{StaticResource Card}" Margin="0,10,0,0" Padding="26,24" ClipToBounds="True">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <!-- the logo: a rotating gradient halo + breathing glow behind the koala mark -->
+          <Grid x:Name="LogoHost" Width="132" Height="132" VerticalAlignment="Center">
+            <Border x:Name="Glow" Width="118" Height="118" CornerRadius="59" Background="{DynamicResource AccentSoftBrush}" RenderTransformOrigin="0.5,0.5">
+              <Border.RenderTransform><ScaleTransform x:Name="GlowScale"/></Border.RenderTransform>
+            </Border>
+            <Border x:Name="Halo" Width="128" Height="128" CornerRadius="64" BorderThickness="2.5" RenderTransformOrigin="0.5,0.5" Opacity="0.85">
+              <Border.BorderBrush>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                  <GradientStop Color="{DynamicResource AccentColor}" Offset="0"/>
+                  <GradientStop Color="Transparent" Offset="0.5"/>
+                  <GradientStop Color="{DynamicResource Accent2Color}" Offset="1"/>
+                </LinearGradientBrush>
+              </Border.BorderBrush>
+              <Border.RenderTransform><RotateTransform x:Name="HaloSpin"/></Border.RenderTransform>
+            </Border>
+            <Image x:Name="Logo" Source="pack://application:,,,/KOALIX;component/Assets/koalix.png" Width="84" Height="84" RenderOptions.BitmapScalingMode="HighQuality" RenderTransformOrigin="0.5,0.5">
+              <Image.RenderTransform>
+                <TransformGroup>
+                  <ScaleTransform x:Name="LogoScale"/>
+                  <TranslateTransform x:Name="LogoBob"/>
+                </TransformGroup>
+              </Image.RenderTransform>
+            </Image>
+          </Grid>
+          <StackPanel Grid.Column="1" Margin="26,0,0,0" VerticalAlignment="Center">
+            <TextBlock Text="KOALIX" FontFamily="{DynamicResource DisplayFont}" FontSize="40" FontWeight="Bold" Foreground="{DynamicResource AccentTextGradientBrush}" FlowDirection="LeftToRight" HorizontalAlignment="Left"/>
+            <TextBlock Text="{l:T About.Tagline}" FontSize="15" Margin="0,2,0,0" TextWrapping="Wrap"/>
+            <WrapPanel Margin="0,12,0,0">
+              <Border CornerRadius="8" Background="{DynamicResource AccentSoftBrush}" Padding="10,4" Margin="0,0,8,6">
+                <TextBlock Text="{Binding Version}" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" FlowDirection="LeftToRight"/>
+              </Border>
+              <Border CornerRadius="8" Background="{DynamicResource ControlBrush}" Padding="10,4" Margin="0,0,8,6">
+                <TextBlock Text="{Binding Runtime}" Style="{StaticResource Subtle}" FlowDirection="LeftToRight"/>
+              </Border>
+              <Border CornerRadius="8" Background="{DynamicResource SuccessSoftBrush}" Padding="10,4" Margin="0,0,8,6" Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVis}}">
+                <TextBlock Text="{l:T About.Admin}" Foreground="{DynamicResource SuccessBrush}" FontWeight="SemiBold"/>
+              </Border>
+            </WrapPanel>
+            <TextBlock Text="{l:T About.Description}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,8,0,0" MaxWidth="620" HorizontalAlignment="Left"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- what it can do -->
+      <TextBlock Text="{l:T About.Features}" FontSize="15" FontWeight="SemiBold" Margin="2,18,0,10"/>
+      <WrapPanel>
+        <Border Style="{StaticResource Feature}"><StackPanel>
+          <TextBlock Text="&#xE774;" Style="{StaticResource Icon}" FontSize="20" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Left"/>
+          <TextBlock Text="{l:T About.F1Title}" FontWeight="SemiBold" Margin="0,8,0,2"/>
+          <TextBlock Text="{l:T About.F1Text}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+        </StackPanel></Border>
+        <Border Style="{StaticResource Feature}"><StackPanel>
+          <TextBlock Text="&#xE8AB;" Style="{StaticResource Icon}" FontSize="20" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Left"/>
+          <TextBlock Text="{l:T About.F2Title}" FontWeight="SemiBold" Margin="0,8,0,2"/>
+          <TextBlock Text="{l:T About.F2Text}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+        </StackPanel></Border>
+        <Border Style="{StaticResource Feature}"><StackPanel>
+          <TextBlock Text="&#xE7FC;" Style="{StaticResource Icon}" FontSize="20" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Left"/>
+          <TextBlock Text="{l:T About.F3Title}" FontWeight="SemiBold" Margin="0,8,0,2"/>
+          <TextBlock Text="{l:T About.F3Text}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+        </StackPanel></Border>
+        <Border Style="{StaticResource Feature}"><StackPanel>
+          <TextBlock Text="&#xE968;" Style="{StaticResource Icon}" FontSize="20" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Left"/>
+          <TextBlock Text="{l:T About.F4Title}" FontWeight="SemiBold" Margin="0,8,0,2"/>
+          <TextBlock Text="{l:T About.F4Text}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+        </StackPanel></Border>
+        <Border Style="{StaticResource Feature}"><StackPanel>
+          <TextBlock Text="&#xE9D9;" Style="{StaticResource Icon}" FontSize="20" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Left"/>
+          <TextBlock Text="{l:T About.F5Title}" FontWeight="SemiBold" Margin="0,8,0,2"/>
+          <TextBlock Text="{l:T About.F5Text}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+        </StackPanel></Border>
+        <Border Style="{StaticResource Feature}"><StackPanel>
+          <TextBlock Text="&#xE790;" Style="{StaticResource Icon}" FontSize="20" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Left"/>
+          <TextBlock Text="{l:T About.F6Title}" FontWeight="SemiBold" Margin="0,8,0,2"/>
+          <TextBlock Text="{l:T About.F6Text}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+        </StackPanel></Border>
+      </WrapPanel>
+
+      <!-- engines -->
+      <TextBlock Text="{l:T About.Engines}" FontSize="15" FontWeight="SemiBold" Margin="2,8,0,10"/>
+      <WrapPanel>
+        <Border Style="{StaticResource EngineRow}"><DockPanel>
+          <Border DockPanel.Dock="Left" Width="8" Height="8" CornerRadius="2" Margin="0,0,10,0" Background="{DynamicResource SuccessBrush}" Visibility="{Binding HasSingBox, Converter={StaticResource BoolToVis}}"/>
+          <Border DockPanel.Dock="Left" Width="8" Height="8" CornerRadius="2" Margin="0,0,10,0" Background="{DynamicResource SubtleTextBrush}" Visibility="{Binding HasSingBox, Converter={StaticResource InverseBoolToVis}}"/>
+          <TextBlock DockPanel.Dock="Right" Text="{l:T About.Installed}" Style="{StaticResource Subtle}" Margin="12,0,0,0" Visibility="{Binding HasSingBox, Converter={StaticResource BoolToVis}}"/>
+          <TextBlock DockPanel.Dock="Right" Text="{l:T About.Missing}" Style="{StaticResource Subtle}" Margin="12,0,0,0" Visibility="{Binding HasSingBox, Converter={StaticResource InverseBoolToVis}}"/>
+          <TextBlock Text="sing-box" FontWeight="SemiBold" FlowDirection="LeftToRight" HorizontalAlignment="Left"/>
+        </DockPanel></Border>
+        <Border Style="{StaticResource EngineRow}"><DockPanel>
+          <Border DockPanel.Dock="Left" Width="8" Height="8" CornerRadius="2" Margin="0,0,10,0" Background="{DynamicResource SuccessBrush}" Visibility="{Binding HasXray, Converter={StaticResource BoolToVis}}"/>
+          <Border DockPanel.Dock="Left" Width="8" Height="8" CornerRadius="2" Margin="0,0,10,0" Background="{DynamicResource SubtleTextBrush}" Visibility="{Binding HasXray, Converter={StaticResource InverseBoolToVis}}"/>
+          <TextBlock DockPanel.Dock="Right" Text="{l:T About.Installed}" Style="{StaticResource Subtle}" Margin="12,0,0,0" Visibility="{Binding HasXray, Converter={StaticResource BoolToVis}}"/>
+          <TextBlock DockPanel.Dock="Right" Text="{l:T About.Missing}" Style="{StaticResource Subtle}" Margin="12,0,0,0" Visibility="{Binding HasXray, Converter={StaticResource InverseBoolToVis}}"/>
+          <TextBlock Text="Xray" FontWeight="SemiBold" FlowDirection="LeftToRight" HorizontalAlignment="Left"/>
+        </DockPanel></Border>
+        <Border Style="{StaticResource EngineRow}"><DockPanel>
+          <Border DockPanel.Dock="Left" Width="8" Height="8" CornerRadius="2" Margin="0,0,10,0" Background="{DynamicResource SuccessBrush}" Visibility="{Binding HasWireGuard, Converter={StaticResource BoolToVis}}"/>
+          <Border DockPanel.Dock="Left" Width="8" Height="8" CornerRadius="2" Margin="0,0,10,0" Background="{DynamicResource SubtleTextBrush}" Visibility="{Binding HasWireGuard, Converter={StaticResource InverseBoolToVis}}"/>
+          <TextBlock DockPanel.Dock="Right" Text="{l:T About.Installed}" Style="{StaticResource Subtle}" Margin="12,0,0,0" Visibility="{Binding HasWireGuard, Converter={StaticResource BoolToVis}}"/>
+          <TextBlock DockPanel.Dock="Right" Text="{l:T About.Missing}" Style="{StaticResource Subtle}" Margin="12,0,0,0" Visibility="{Binding HasWireGuard, Converter={StaticResource InverseBoolToVis}}"/>
+          <TextBlock Text="WireGuard" FontWeight="SemiBold" FlowDirection="LeftToRight" HorizontalAlignment="Left"/>
+        </DockPanel></Border>
+        <Border Style="{StaticResource EngineRow}"><DockPanel>
+          <Border DockPanel.Dock="Left" Width="8" Height="8" CornerRadius="2" Margin="0,0,10,0" Background="{DynamicResource SuccessBrush}" Visibility="{Binding HasWireSock, Converter={StaticResource BoolToVis}}"/>
+          <Border DockPanel.Dock="Left" Width="8" Height="8" CornerRadius="2" Margin="0,0,10,0" Background="{DynamicResource SubtleTextBrush}" Visibility="{Binding HasWireSock, Converter={StaticResource InverseBoolToVis}}"/>
+          <TextBlock DockPanel.Dock="Right" Text="{l:T About.Installed}" Style="{StaticResource Subtle}" Margin="12,0,0,0" Visibility="{Binding HasWireSock, Converter={StaticResource BoolToVis}}"/>
+          <TextBlock DockPanel.Dock="Right" Text="{l:T About.Missing}" Style="{StaticResource Subtle}" Margin="12,0,0,0" Visibility="{Binding HasWireSock, Converter={StaticResource InverseBoolToVis}}"/>
+          <TextBlock Text="WireSock" FontWeight="SemiBold" FlowDirection="LeftToRight" HorizontalAlignment="Left"/>
+        </DockPanel></Border>
+      </WrapPanel>
+
+      <!-- shortcuts -->
+      <WrapPanel Margin="0,10,0,0">
+        <Button Content="{l:T About.ReplayTour}" Command="{Binding ReplayTourCommand}" Style="{StaticResource AccentButton}"/>
+        <Button Content="{l:T About.OpenData}" Command="{Binding OpenDataFolderCommand}"/>
+        <Button Content="{l:T About.CopyInfo}" Command="{Binding CopyInfoCommand}" Style="{StaticResource GhostButton}"/>
+      </WrapPanel>
+      <TextBlock Text="{Binding DataFolder}" Style="{StaticResource Subtle}" FontFamily="{StaticResource MonoFont}" FontSize="11" Margin="2,8,0,0" FlowDirection="LeftToRight" HorizontalAlignment="Left" TextTrimming="CharacterEllipsis"/>
+      <TextBlock Text="{l:T About.MadeWith}" Style="{StaticResource Subtle}" Margin="2,16,0,0" TextWrapping="Wrap"/>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

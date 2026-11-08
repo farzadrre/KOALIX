@@ -1,0 +1,18 @@
+<Application x:Class="Koalix.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Koalix.App.Localization"
+             xmlns:c="clr-namespace:Koalix.App.Controls"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/KOALIX;component/Themes/Dark.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/KOALIX;component/Themes/Controls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+            <loc:NullToCollapsedConverter x:Key="NullToCollapsed"/>
+            <c:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

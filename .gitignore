@@ -1,0 +1,29 @@
+# build output
+bin/
+obj/
+output/
+release/
+artifacts/
+publish/
+TestResults/
+*.binlog
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.rsuser
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# never commit user data / secrets
+*.db
+*.db-*
+*.sqlite
+*.pfx
+*.snk
+.env
+session.lock
