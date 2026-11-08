@@ -1,0 +1,82 @@
+# Push a tag like v0.4.39 →  tests, then a GitHub Release with:
+#   KOALIX-<ver>-portable-win-x64.exe   single-file portable build
+#   KoalixApp-win-Setup.exe             installer (gets in-app updates)
+#   releases.win.json + *.nupkg         Velopack update feed read by Settings › Updates
+name: Release (Windows)
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: 1
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Version + release notes from tag / CHANGELOG
+        id: ver
+        shell: pwsh
+        run: |
+          $v = '${{ github.ref_name }}'.TrimStart('v')
+          "version=$v" >> $env:GITHUB_OUTPUT
+          $lines = Get-Content CHANGELOG.md -Encoding utf8
+          $start = ($lines | Select-String -Pattern "^## $([regex]::Escape($v))\b" | Select-Object -First 1).LineNumber
+          if ($start) {
+            $rest = $lines[$start..($lines.Count-1)]
+            $end = ($rest | Select-String -Pattern '^## ' | Select-Object -First 1).LineNumber
+            $body = if ($end) { $rest[0..($end-2)] } else { $rest }
+            @($lines[$start-1]) + $body | Set-Content notes.md -Encoding utf8
+          } else { "KOALIX $v" | Set-Content notes.md -Encoding utf8 }
+
+      - name: Test
+        run: dotnet test tests/Koalix.Tests -c Release
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk --version 1.2.161; if ($LASTEXITCODE) { dotnet tool install -g vpk }
+
+      - name: Download previous release (delta updates)
+        continue-on-error: true
+        env: { DOTNET_ROLL_FORWARD: Major }
+        run: vpk download github --repoUrl $env:REPO_URL --token ${{ secrets.GITHUB_TOKEN }} -o artifacts/releases
+
+      - name: Publish (installer input)
+        run: dotnet publish src/Koalix.App/Koalix.App.csproj -c Release -r win-x64 --self-contained true -p:Version=${{ steps.ver.outputs.version }} -o artifacts/velopack-input
+
+      - name: Pack installer + update feed
+        env: { DOTNET_ROLL_FORWARD: Major }
+        run: >-
+          vpk pack -u KoalixApp -v ${{ steps.ver.outputs.version }} -r win-x64
+          -p artifacts/velopack-input -e KOALIX.exe --packTitle KOALIX --packAuthors KOALIX
+          -i installer/assets/koalix.ico -s installer/assets/splash.png
+          --releaseNotes notes.md -o artifacts/releases
+
+      - name: Publish portable single-file
+        shell: pwsh
+        run: |
+          dotnet publish src/Koalix.App/Koalix.App.csproj -c Release -r win-x64 --self-contained true -p:Version=${{ steps.ver.outputs.version }} -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/portable
+          Copy-Item artifacts/portable/KOALIX.exe "artifacts/KOALIX-${{ steps.ver.outputs.version }}-portable-win-x64.exe"
+
+      - name: Upload release + update feed
+        env: { DOTNET_ROLL_FORWARD: Major }
+        run: vpk upload github --repoUrl $env:REPO_URL --token ${{ secrets.GITHUB_TOKEN }} --publish --releaseName "KOALIX ${{ steps.ver.outputs.version }}" --tag ${{ github.ref_name }} -o artifacts/releases
+
+      - name: Attach portable exe + notes
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          body_path: notes.md
+          files: artifacts/KOALIX-*-portable-win-x64.exe

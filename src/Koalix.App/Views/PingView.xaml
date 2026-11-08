@@ -1,0 +1,28 @@
+<UserControl x:Class="Koalix.App.Views.PingView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="clr-namespace:Koalix.App.Localization" xmlns:c="clr-namespace:Koalix.App.Controls">
+  <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+    <TextBlock Text="{l:T Ping.Title}" Style="{StaticResource Title}"/>
+    <TextBlock Text="{l:T Ping.Subtitle}" Style="{StaticResource Subtitle}"/>
+    <Border Style="{StaticResource Card}">
+      <WrapPanel>
+        <ComboBox ItemsSource="{Binding Presets}" Text="{Binding Target, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" MinWidth="220" FlowDirection="LeftToRight"/>
+        <Button Command="{Binding ToggleCommand}" Style="{StaticResource AccentButton}" MinWidth="110">
+          <Button.Content><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Ping.Button"><Binding Path="Running"/><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></Button.Content>
+        </Button>
+        <TextBlock Text="{Binding Quality}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0"/>
+        <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource DangerBrush}" VerticalAlignment="Center"/>
+      </WrapPanel>
+    </Border>
+    <UniformGrid Columns="6">
+      <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="{l:T Ping.Current}" Style="{StaticResource Subtle}"/><TextBlock Text="{Binding Current}" Style="{StaticResource Metric}" FontSize="22"/></StackPanel></Border> <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="{l:T Ping.Min}" Style="{StaticResource Subtle}"/><TextBlock Text="{Binding Min}" Style="{StaticResource Metric}" FontSize="22"/></StackPanel></Border> <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="{l:T Ping.Avg}" Style="{StaticResource Subtle}"/><TextBlock Text="{Binding Avg}" Style="{StaticResource Metric}" FontSize="22"/></StackPanel></Border> <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="{l:T Ping.Max}" Style="{StaticResource Subtle}"/><TextBlock Text="{Binding Max}" Style="{StaticResource Metric}" FontSize="22"/></StackPanel></Border> <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="{l:T Dns.Jitter}" Style="{StaticResource Subtle}"/><TextBlock Text="{Binding Jitter}" Style="{StaticResource Metric}" FontSize="22"/></StackPanel></Border> <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="{l:T Dns.Loss}" Style="{StaticResource Subtle}"/><TextBlock Text="{Binding Loss}" Style="{StaticResource Metric}" FontSize="22"/></StackPanel></Border>
+    </UniformGrid>
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{l:T Ping.Chart}" Style="{StaticResource CardTitle}"/>
+        <!-- v0.4.19: the waves MOVE — every point of the line rides a slow sine (Sparkline.Flow), so the chart
+             reads as living water while new samples keep arriving; v0.4.18's whole-chart drift is replaced. -->
+        <c:Sparkline Values="{Binding Samples}" Flow="True" Height="200" Stroke="{DynamicResource AccentBrush}"/>
+        <TextBlock Text="{l:T Ping.Formula}" Style="{StaticResource Subtle}" Margin="0,8,0,0"/>
+      </StackPanel>
+    </Border>
+  </StackPanel></ScrollViewer>
+</UserControl>

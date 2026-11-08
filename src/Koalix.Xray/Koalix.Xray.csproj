@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koalix.Core\Koalix.Core.csproj" />
+    <ProjectReference Include="..\Koalix.Tunneling\Koalix.Tunneling.csproj" />
+    <ProjectReference Include="..\Koalix.SplitTunneling\Koalix.SplitTunneling.csproj" />
+    <ProjectReference Include="..\Koalix.SingBox\Koalix.SingBox.csproj" />
+  </ItemGroup>
+</Project>

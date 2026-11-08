@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Koalix.App/Koalix.App.csproj" />
+    <Project Path="src/Koalix.Core/Koalix.Core.csproj" />
+    <Project Path="src/Koalix.Dns/Koalix.Dns.csproj" />
+    <Project Path="src/Koalix.Infrastructure/Koalix.Infrastructure.csproj" />
+    <Project Path="src/Koalix.SingBox/Koalix.SingBox.csproj" />
+    <Project Path="src/Koalix.SplitTunneling/Koalix.SplitTunneling.csproj" />
+    <Project Path="src/Koalix.SystemIntegration/Koalix.SystemIntegration.csproj" />
+    <Project Path="src/Koalix.Tunneling/Koalix.Tunneling.csproj" />
+    <Project Path="src/Koalix.WireGuard/Koalix.WireGuard.csproj" />
+    <Project Path="src/Koalix.Xray/Koalix.Xray.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Koalix.Tests/Koalix.Tests.csproj" />
+  </Folder>
+</Solution>

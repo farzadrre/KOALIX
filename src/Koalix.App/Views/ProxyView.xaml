@@ -1,0 +1,20 @@
+<UserControl x:Class="Koalix.App.Views.ProxyView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="clr-namespace:Koalix.App.Localization" xmlns:c="clr-namespace:Koalix.App.Controls">
+  <StackPanel>
+    <TextBlock Text="{l:T Proxy.Title}" Style="{StaticResource Title}"/>
+    <TextBlock Text="{l:T Proxy.Subtitle}" Style="{StaticResource Subtitle}"/>
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{l:T Proxy.Current}" Style="{StaticResource Subtle}"/>
+        <TextBlock Text="{Binding Current}" FontWeight="SemiBold" Margin="0,4,0,12"/>
+        <WrapPanel>
+          <TextBlock Text="{l:T Proxy.Port}" VerticalAlignment="Center" Margin="0,0,8,8"/>
+          <TextBox Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}" Width="100" FlowDirection="LeftToRight"/>
+          <Button Content="{l:T Proxy.Enable}" Command="{Binding EnableCommand}" Style="{StaticResource AccentButton}"/>
+          <Button Content="{l:T Proxy.Restore}" Command="{Binding RestoreCommand}"/>
+        </WrapPanel>
+        <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource AccentBrush}"/>
+        <TextBlock Text="{l:T Proxy.Note}" Style="{StaticResource Subtle}" Margin="0,8,0,0"/>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

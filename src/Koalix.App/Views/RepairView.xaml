@@ -1,0 +1,43 @@
+<UserControl x:Class="Koalix.App.Views.RepairView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="clr-namespace:Koalix.App.Localization" xmlns:c="clr-namespace:Koalix.App.Controls">
+  <DockPanel>
+    <StackPanel DockPanel.Dock="Top">
+      <TextBlock Text="{l:T Repair.Title}" Style="{StaticResource Title}"/>
+      <TextBlock Text="{l:T Repair.Subtitle}" Style="{StaticResource Subtitle}"/>
+    </StackPanel>
+    <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="1.3*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding Items}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Style="{StaticResource Card}">
+                <Grid>
+                  <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitle}"/>
+                      <Border CornerRadius="6" Background="{DynamicResource AccentSoftBrush}" Padding="6,1" Margin="8,0,0,8" VerticalAlignment="Top"><TextBlock Text="{Binding Risk}" FontSize="11"/></Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding Explain}" Style="{StaticResource Subtle}"/>
+                  </StackPanel>
+                  <Button Grid.Column="1" Content="{l:T Repair.Run}" VerticalAlignment="Center" Margin="12,0,0,0"
+                          Command="{Binding DataContext.RunCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"/>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <Border Grid.Column="1" Style="{StaticResource Card}">
+        <DockPanel>
+          <WrapPanel DockPanel.Dock="Top">
+            <TextBlock Text="{l:T Repair.Output}" Style="{StaticResource CardTitle}" Margin="0,0,12,8"/>
+            <Button Content="{l:T Repair.SelfCheck}" Command="{Binding SelfCheckCommand}" Style="{StaticResource AccentButton}"/>
+            <Button Content="{l:T Repair.TestGateway}" Command="{Binding TestGatewayCommand}"/>
+          </WrapPanel>
+          <TextBox Text="{Binding Output, Mode=OneWay}" Style="{StaticResource CodeBox}" IsReadOnly="True"/>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </DockPanel>
+</UserControl>

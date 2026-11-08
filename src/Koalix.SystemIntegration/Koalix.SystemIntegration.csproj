@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koalix.Core\Koalix.Core.csproj" />
+    <ProjectReference Include="..\Koalix.SingBox\Koalix.SingBox.csproj" />
+    <ProjectReference Include="..\Koalix.Tunneling\Koalix.Tunneling.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+  </ItemGroup>
+</Project>

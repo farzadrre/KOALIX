@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>KOALIX</AssemblyName>
+    <RootNamespace>Koalix.App</RootNamespace>
+    <ApplicationIcon>Assets\koalix.ico</ApplicationIcon>
+    <TieredPGO>true</TieredPGO>
+    <ServerGarbageCollector>false</ServerGarbageCollector>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <!-- Custom entry point (Program.cs) so Velopack install/update hooks run before WPF starts. -->
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <StartupObject>Koalix.App.Program</StartupObject>
+    <NoWarn>$(NoWarn);MVVMTK0045;CA1416;WFO0003</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koalix.Core\Koalix.Core.csproj" />
+    <ProjectReference Include="..\Koalix.Dns\Koalix.Dns.csproj" />
+    <ProjectReference Include="..\Koalix.Tunneling\Koalix.Tunneling.csproj" />
+    <ProjectReference Include="..\Koalix.SingBox\Koalix.SingBox.csproj" />
+    <ProjectReference Include="..\Koalix.Xray\Koalix.Xray.csproj" />
+    <ProjectReference Include="..\Koalix.WireGuard\Koalix.WireGuard.csproj" />
+    <ProjectReference Include="..\Koalix.SplitTunneling\Koalix.SplitTunneling.csproj" />
+    <ProjectReference Include="..\Koalix.SystemIntegration\Koalix.SystemIntegration.csproj" />
+    <ProjectReference Include="..\Koalix.Infrastructure\Koalix.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Localization\*.json" />
+    <Resource Include="Assets\koalix.ico" />
+    <Resource Include="Assets\koalix.png" />
+    <Resource Include="Assets\Fonts\*.ttf" />
+    <!-- v0.4.12: all ISO-3166 flags ship inside the exe — flagcdn.com is unreachable/slow on many Iranian ISPs,
+         and Windows never renders flag emoji (letter pairs instead). Embedded = always visible, zero network. -->
+    <Resource Include="Assets\Flags\*.png" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,416 @@
+<UserControl x:Class="Koalix.App.Views.SettingsView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="clr-namespace:Koalix.App.Localization" xmlns:c="clr-namespace:Koalix.App.Controls" xmlns:svc="clr-namespace:Koalix.App.Services">
+  <UserControl.Resources>
+    <Style x:Key="Swatch" TargetType="ListBoxItem">
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <Grid Width="34" Height="34" Margin="0,0,6,6">
+              <!-- v0.4.13: rounded-rectangle swatches (was circles) — the no-ovals design rule. -->
+              <Border x:Name="ring" CornerRadius="10" BorderBrush="{DynamicResource TextBrush}" BorderThickness="2" Opacity="0" Background="Transparent"/>
+              <Border Margin="4" CornerRadius="7" Background="{Binding}"/>
+              <TextBlock x:Name="tick" Text="&#xE73E;" Style="{StaticResource Icon}" FontSize="11" Foreground="White" HorizontalAlignment="Center" Opacity="0"/>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ring" Property="Opacity" Value="0.4"/></Trigger>
+              <Trigger Property="IsSelected" Value="True"><Setter TargetName="ring" Property="Opacity" Value="1"/><Setter TargetName="tick" Property="Opacity" Value="1"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </UserControl.Resources>
+  <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+    <TextBlock Text="{l:T Settings.Title}" Style="{StaticResource Title}"/>
+    <TextBlock Text="{l:T Settings.Subtitle}" Style="{StaticResource Subtitle}"/>
+
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{l:T Settings.Appearance}" Style="{StaticResource CardTitle}"/>
+        <WrapPanel>
+          <StackPanel Margin="0,0,16,0"><TextBlock Text="{l:T Settings.Language}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+            <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding Language}"><ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="NoWrap"><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Lang"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+          <StackPanel Margin="0,0,16,0"><TextBlock Text="{l:T Settings.Theme}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+            <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme2}"><ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="NoWrap"><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Theme"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+          <StackPanel Margin="0,0,16,0"><TextBlock Text="{l:T Settings.Backdrop}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+            <ComboBox ItemsSource="{Binding Backdrops}" SelectedItem="{Binding Backdrop}"><ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="NoWrap"><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Backdrop"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+          <!-- v0.4.14: connect-button shape — rounded tile (0.4.13 look) or the classic circle orb, with a live mini preview in the dropdown. -->
+          <StackPanel Margin="0,0,16,0" ToolTip="{l:T Settings.ConnectShapeHint}"><TextBlock Text="{l:T Settings.ConnectShape}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+            <ComboBox ItemsSource="{Binding ConnectShapes}" SelectedItem="{Binding ConnectShape}" MinWidth="190">
+              <ComboBox.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Orientation="Horizontal">
+                    <Border x:Name="sq" Width="16" Height="16" CornerRadius="5" Background="{DynamicResource AccentGradientBrush}" VerticalAlignment="Center"/>
+                    <Border x:Name="ci" Width="16" Height="16" CornerRadius="8" Background="{DynamicResource AccentGradientBrush}" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    <TextBlock x:Name="tsq" Text="{l:T Settings.ShapeRounded}" Margin="9,0,0,0" TextWrapping="NoWrap"/>
+                    <TextBlock x:Name="tci" Text="{l:T Settings.ShapeCircle}" Margin="9,0,0,0" TextWrapping="NoWrap" Visibility="Collapsed"/>
+                  </StackPanel>
+                  <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding}" Value="circle">
+                      <Setter TargetName="sq" Property="Visibility" Value="Collapsed"/>
+                      <Setter TargetName="ci" Property="Visibility" Value="Visible"/>
+                      <Setter TargetName="tsq" Property="Visibility" Value="Collapsed"/>
+                      <Setter TargetName="tci" Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                  </DataTemplate.Triggers>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox></StackPanel>
+          <!-- v0.4.38 - style presets: corners + fonts + card surface -->
+          <StackPanel Margin="0,0,16,0" ToolTip="{l:T Settings.StyleHint}"><TextBlock Text="{l:T Settings.Style}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+            <ComboBox ItemsSource="{Binding UiStyles}" SelectedItem="{Binding UiStyle}" MinWidth="170"><ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="NoWrap"><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Style"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+          <StackPanel Margin="0,0,16,0" ToolTip="{l:T Settings.ArgbReactiveHint}"><TextBlock Text="{l:T Settings.ArgbReactive}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+            <ComboBox ItemsSource="{Binding ReactiveModes}" SelectedItem="{Binding ArgbReactive}" MinWidth="170"><ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="NoWrap"><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Reactive"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+        </WrapPanel>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.Glass}" IsChecked="{Binding Glass}" Margin="0,10,0,0" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.GlassHint}" Style="{StaticResource Subtle}"/>
+        <!-- v0.4.26 — THE COLOUR WORKSHOP (user: «بخش رنگ تاکیدی و پالت رنگی یکی ان باهم ادغامشون کن و قابلیتشونو
+             بیشتر کن»): the palette cards and the accent picker are ONE section now — named palette cards (plus the
+             user's own SAVED cards, deletable), the accent swatch grid, a random-accent die, save-current-as-palette,
+             and six one-click shade variants of whatever accent is live. -->
+        <TextBlock Text="{l:T Settings.ColorsAndPalettes}" Style="{StaticResource Subtle}" Margin="0,10,0,2"/>
+        <ItemsControl ItemsSource="{Binding Palettes}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Grid Width="124" Height="66" Margin="0,0,10,10">
+                <Button Command="{Binding DataContext.SetPaletteCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding Hex}"
+                        Padding="0" BorderThickness="0" Background="Transparent" Cursor="Hand" ToolTip="{l:T Settings.PalettesHint}" Focusable="False">
+                  <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                      <Grid>
+                        <!-- the colour tile: diagonal gradient of the palette colour over a dark base -->
+                        <Border x:Name="tile" CornerRadius="12">
+                          <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                              <GradientStop Color="#222529" Offset="0"/>
+                              <GradientStop Color="{Binding Hex, Converter={x:Static c:HexToColor.Instance}}" Offset="0.28"/>
+                              <GradientStop Color="#222529" Offset="1"/>
+                            </LinearGradientBrush>
+                          </Border.Background>
+                          <!-- soft sheen + the palette's own glow -->
+                          <Border CornerRadius="12">
+                            <Border.Background>
+                              <RadialGradientBrush GradientOrigin="0.15,0.1" Center="0.3,0.25" RadiusX="0.9" RadiusY="0.9">
+                                <GradientStop Color="#66FFFFFF" Offset="0"/>
+                                <GradientStop Color="#00FFFFFF" Offset="0.55"/>
+                              </RadialGradientBrush>
+                            </Border.Background>
+                          </Border>
+                        </Border>
+                        <!-- name on a bottom scrim: localized title for built-ins, the hex itself for saved ones -->
+                        <Border VerticalAlignment="Bottom" CornerRadius="0,0,12,12" Padding="10,5" Background="#B3141619">
+                          <Grid>
+                            <TextBlock x:Name="builtinName" FontSize="11.5" FontWeight="SemiBold" Foreground="#FFF2F5F9" HorizontalAlignment="Center" TextWrapping="NoWrap">
+                              <TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}"><Binding Path="NameKey"/><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text>
+                            </TextBlock>
+                            <TextBlock x:Name="customName" Text="{Binding HexLabel}" FontFamily="{StaticResource LatinFont}" FontSize="11.5" FontWeight="SemiBold" Foreground="#FFF2F5F9" HorizontalAlignment="Center" Visibility="Collapsed"/>
+                          </Grid>
+                        </Border>
+                        <!-- active check badge (v0.4.24) -->
+                        <Border x:Name="badge" Width="22" Height="22" CornerRadius="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,7,0"
+                                Background="#E6141619" Visibility="Collapsed">
+                          <TextBlock Text="&#xE73E;" Style="{StaticResource Icon}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#FF2EE08A"/>
+                        </Border>
+                        <!-- hover ring + press feedback -->
+                        <Border x:Name="ring" CornerRadius="12" BorderThickness="2" BorderBrush="{DynamicResource AccentBrush}" Opacity="0" IsHitTestVisible="False"/>
+                      </Grid>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="ring" Property="Opacity" Value="0.75"/>
+                        </Trigger>
+                        <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                          <Setter TargetName="badge" Property="Visibility" Value="Visible"/>
+                          <Setter TargetName="ring" Property="Opacity" Value="1"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsCustom}" Value="True">
+                          <Setter TargetName="builtinName" Property="Visibility" Value="Collapsed"/>
+                          <Setter TargetName="customName" Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                        <!-- v0.4.37 — the ARGB card: a full rainbow tile (the accent itself cycles once it is picked) -->
+                        <DataTrigger Binding="{Binding IsRgb}" Value="True">
+                          <Setter TargetName="tile" Property="Background">
+                            <Setter.Value>
+                              <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#FFFF3B5C" Offset="0"/>
+                                <GradientStop Color="#FFFF9F1C" Offset="0.18"/>
+                                <GradientStop Color="#FFF5E642" Offset="0.34"/>
+                                <GradientStop Color="#FF2EE08A" Offset="0.5"/>
+                                <GradientStop Color="#FF22B8FF" Offset="0.66"/>
+                                <GradientStop Color="#FF7C5CFF" Offset="0.82"/>
+                                <GradientStop Color="#FFEC4899" Offset="1"/>
+                              </LinearGradientBrush>
+                            </Setter.Value>
+                          </Setter>
+                        </DataTrigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Button.Template>
+                </Button>
+                <!-- v0.4.26 — the delete × for USER-SAVED palettes (built-ins never show it) -->
+                <Button x:Name="del" Command="{Binding DataContext.DeletePaletteCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding Hex}"
+                        Width="20" Height="20" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="5,5,0,0"
+                        Visibility="Collapsed" Focusable="False" ToolTip="{l:T Palette.DeleteHint}" Cursor="Hand">
+                  <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                      <Border x:Name="bd" CornerRadius="6" Background="#E6141619">
+                        <TextBlock Text="&#xE711;" Style="{StaticResource Icon}" FontSize="10" Foreground="#FFEFC1C1" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="bd" Property="Background" Value="#F0B33838"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Button.Template>
+                </Button>
+              </Grid>
+              <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsCustom}" Value="True">
+                  <Setter TargetName="del" Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+              </DataTemplate.Triggers>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <WrapPanel Margin="0,4,0,0">
+          <ListBox ItemsSource="{Binding Accents}" SelectedItem="{Binding Accent}" ItemContainerStyle="{StaticResource Swatch}">
+            <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>
+          </ListBox>
+          <!-- v0.4.26 — 🎲 random accent + 💾 save the current colour as a palette card -->
+          <Button Content="{l:T Palette.Random}" Command="{Binding RandomAccentCommand}" Margin="8,0,0,0" VerticalAlignment="Center" ToolTip="{l:T Palette.Random}"/>
+          <Button Content="{l:T Palette.SaveCurrent}" Command="{Binding SaveCurrentAsPaletteCommand}" Margin="6,0,0,0" VerticalAlignment="Center" ToolTip="{l:T Palette.SaveCurrentHint}"/>
+          <TextBox Text="{Binding CustomAccent, UpdateSourceTrigger=PropertyChanged}" Width="120" Tag="#RRGGBB" Style="{StaticResource LatinBox}" ToolTip="{l:T Settings.CustomAccent}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+        </WrapPanel>
+        <!-- v0.4.26 — six click-away variants of the live accent (tooltip = the hex) -->
+        <WrapPanel Margin="0,8,0,0">
+          <TextBlock Text="{l:T Palette.Shades}" Style="{StaticResource Subtle}" VerticalAlignment="Center" Margin="0,0,8,4"/>
+          <ItemsControl ItemsSource="{Binding ShadeVariants}">
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Button Command="{Binding DataContext.SetPaletteCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding Hex}"
+                        Width="26" Height="26" Margin="0,0,6,6" Focusable="False" Cursor="Hand" ToolTip="{Binding Hex}">
+                  <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                      <Border x:Name="tile" CornerRadius="7" BorderThickness="1" BorderBrush="#33FFFFFF">
+                        <Border.Background><SolidColorBrush Color="{Binding Hex, Converter={x:Static c:HexToColor.Instance}}"/></Border.Background>
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="tile" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                          <Setter TargetName="tile" Property="Opacity" Value="0.85"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Button.Template>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </WrapPanel>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.Effects}" IsChecked="{Binding Effects}" Margin="0,10,0,0" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.EffectsHint}" Style="{StaticResource Subtle}"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.LiveBg}" IsChecked="{Binding LiveBackground}" Margin="0,10,0,0" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.LiveBgHint}" Style="{StaticResource Subtle}"/>
+      </StackPanel>
+    </Border>
+
+    <!-- v0.4.38 - the floating mini widget (Afterburner-style overlay) -->
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{l:T Settings.Widget}" Style="{StaticResource CardTitle}"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.WidgetEnabled}" IsChecked="{Binding WidgetEnabled}" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.WidgetHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+        <WrapPanel Margin="0,10,0,0">
+          <StackPanel Margin="0,0,16,8"><TextBlock Text="{l:T Settings.WidgetMode}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+            <ComboBox ItemsSource="{Binding WidgetModes}" SelectedItem="{Binding WidgetMode}" MinWidth="200"><ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="NoWrap"><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Widget.Mode"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+          <StackPanel Margin="0,0,16,8" MinWidth="240"><TextBlock Text="{l:T Settings.WidgetOpacity}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Right" Text="{Binding WidgetOpacity, StringFormat={}{0:0}%}" Width="40" VerticalAlignment="Center" Style="{StaticResource Latin}" FontWeight="SemiBold" Margin="8,0,0,0"/>
+              <Slider Minimum="30" Maximum="100" Value="{Binding WidgetOpacity}" VerticalAlignment="Center" IsMoveToPointEnabled="True" SmallChange="5" LargeChange="10" FlowDirection="LeftToRight"/>
+            </DockPanel></StackPanel>
+          <Button Content="{l:T Settings.WidgetReset}" Command="{Binding ResetWidgetPositionCommand}" Style="{StaticResource GhostButton}" VerticalAlignment="Bottom" Margin="0,0,0,8"/>
+        </WrapPanel>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.WidgetLock}" IsChecked="{Binding WidgetLocked}" HorizontalAlignment="Left" MinWidth="380"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.WidgetClickThrough}" IsChecked="{Binding WidgetClickThrough}" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.WidgetClickThroughHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+        <TextBlock Text="{l:T Settings.WidgetTempHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="11"/>
+      </StackPanel>
+    </Border>
+
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{l:T Settings.Connection}" Style="{StaticResource CardTitle}"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.AutoReconnect}" IsChecked="{Binding AutoReconnect}" HorizontalAlignment="Left" MinWidth="380"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.KillSwitch}" IsChecked="{Binding KillSwitch}" HorizontalAlignment="Left" MinWidth="380"/>
+        <!-- v0.4.18: close every foreign VPN/filter-breaker client KOALIX detects, right before connecting -->
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.KillForeignVpn}" IsChecked="{Binding KillForeignVpn}" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.KillForeignVpnHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,4"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.Hotkey}" IsChecked="{Binding GlobalHotkey}" HorizontalAlignment="Left" MinWidth="380"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.RevertOnExit}" IsChecked="{Binding RevertBoostsOnExit}" HorizontalAlignment="Left" MinWidth="380"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.AutoSubs}" IsChecked="{Binding AutoRefreshSubs}" HorizontalAlignment="Left" MinWidth="380"/>
+        <WrapPanel Margin="0,6,0,0">
+          <StackPanel Margin="0,0,14,0"><TextBlock Text="{l:T Settings.RemoteDns}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+            <TextBox Text="{Binding RemoteDns, UpdateSourceTrigger=LostFocus}" Width="160" Style="{StaticResource LatinBox}"/></StackPanel>
+          <StackPanel><TextBlock Text="{l:T Settings.DirectDns}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+            <TextBox Text="{Binding DirectDns, UpdateSourceTrigger=LostFocus}" Width="160" Style="{StaticResource LatinBox}"/></StackPanel>
+        </WrapPanel>
+      </StackPanel>
+    </Border>
+
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <DockPanel>
+          <Border DockPanel.Dock="Right" Style="{StaticResource Pill}"><TextBlock Style="{StaticResource Latin}" FontSize="12" FontWeight="SemiBold"><Run Text="v"/><Run Text="{Binding AppVersion, Mode=OneWay}"/></TextBlock></Border>
+          <TextBlock Text="{l:T Update.Title}" Style="{StaticResource CardTitle}"/>
+        </DockPanel>
+        <TextBlock Text="{l:T Update.FeedLabel}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+        <TextBox Text="{Binding UpdateFeed, UpdateSourceTrigger=LostFocus}" Tag="{x:Static svc:UpdateService.DefaultFeed}" Style="{StaticResource LatinBox}" MaxWidth="560" HorizontalAlignment="Stretch"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Update.Auto}" IsChecked="{Binding AutoUpdate}" HorizontalAlignment="Left" MinWidth="380"/>
+        <WrapPanel>
+          <Button Content="{l:T Update.Check}" Command="{Binding CheckUpdatesCommand}" Style="{StaticResource AccentButton}"/>
+          <Button Content="{l:T Update.Install}" Command="{Binding InstallUpdateCommand}" Visibility="{Binding UpdateReady, Converter={StaticResource BoolToVis}}" Style="{StaticResource AccentButton}"/>
+        </WrapPanel>
+        <ProgressBar Value="{Binding UpdateProgress}" Visibility="{Binding UpdateBusy, Converter={StaticResource BoolToVis}}" Margin="0,2,0,8" MaxWidth="560" HorizontalAlignment="Stretch"/>
+        <TextBlock Text="{Binding UpdateStatus}" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold"/>
+        <TextBlock Text="{l:T Update.Hint}" Style="{StaticResource Subtle}" Margin="0,6,0,0"/>
+      </StackPanel>
+    </Border>
+
+    <!-- v0.4.15: default mode — the safe baseline KOALIX ships with (WireSock on when installed, strict routing
+         off), with a one-click reset after experimenting. -->
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{l:T Settings.DefaultMode}" Style="{StaticResource CardTitle}"/>
+        <TextBlock Text="{l:T Settings.DefaultModeHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+        <StackPanel Orientation="Horizontal">
+          <Button Content="{l:T Settings.ResetDefaults}" Command="{Binding ResetDefaultsCommand}" Style="{StaticResource AccentButton}"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{l:T Settings.Engines}" Style="{StaticResource CardTitle}"/>
+        <Grid Margin="0,0,0,6">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+          <TextBlock Text="sing-box" FontWeight="SemiBold" VerticalAlignment="Center" Style="{StaticResource Latin}" HorizontalAlignment="Left"/>
+          <TextBlock Grid.Column="1" Text="{Binding SingBoxVersion}" VerticalAlignment="Center" Style="{StaticResource Subtle}"/>
+          <Button Grid.Column="2" Content="{l:T Settings.InstallUpdate}" Command="{Binding InstallSingBoxCommand}"/>
+          <TextBlock Grid.Row="1" Text="Xray" FontWeight="SemiBold" VerticalAlignment="Center" Style="{StaticResource Latin}" HorizontalAlignment="Left"/>
+          <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding XrayVersion}" VerticalAlignment="Center" Style="{StaticResource Subtle}"/>
+          <Button Grid.Row="1" Grid.Column="2" Content="{l:T Settings.InstallUpdate}" Command="{Binding InstallXrayCommand}"/>
+          <TextBlock Grid.Row="2" Text="WireGuard" FontWeight="SemiBold" VerticalAlignment="Center" Style="{StaticResource Latin}" HorizontalAlignment="Left"/>
+          <TextBlock Grid.Row="2" Grid.Column="1" Text="{l:T Settings.WireGuardBuiltIn}" VerticalAlignment="Center" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+          <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource Pill}" Background="{DynamicResource SuccessSoftBrush}" Margin="0,0,8,8">
+            <TextBlock Text="{l:T Settings.Ready}" Foreground="{DynamicResource SuccessBrush}" FontWeight="SemiBold"/>
+          </Border>
+          <!-- OpenVPN (v0.4.15): runs the OFFICIAL openvpn.exe — installed from openvpn.net or dropped into engines\openvpn\. -->
+          <TextBlock Grid.Row="3" Text="OpenVPN" FontWeight="SemiBold" VerticalAlignment="Center" Style="{StaticResource Latin}" HorizontalAlignment="Left"/>
+          <TextBlock Grid.Row="3" Grid.Column="1" Text="{l:T Settings.OpenVpnNote}" VerticalAlignment="Center" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+          <Button Grid.Row="3" Grid.Column="2" Command="{Binding OpenVpnDownloadCommand}" ToolTip="{l:T Settings.OpenVpnNote}">
+            <Button.Content>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{l:T Settings.Ready}" FontWeight="SemiBold" Foreground="{DynamicResource SuccessBrush}" Visibility="{Binding OpenVpnInstalled, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock Text="{l:T Settings.OpenVpnGet}" FontWeight="SemiBold" Visibility="{Binding OpenVpnInstalled, Converter={StaticResource InverseBoolToVis}}"/>
+              </StackPanel>
+            </Button.Content>
+          </Button>
+        </Grid>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.OfficialWireGuard}" IsChecked="{Binding OfficialWireGuard}" IsEnabled="{Binding OfficialWireGuardInstalled}" HorizontalAlignment="Left" MinWidth="380"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.UseWireSock}" IsChecked="{Binding UseWireSock}" IsEnabled="{Binding WireSockInstalled}" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.WireSockNote}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.TunnelIpv6}" IsChecked="{Binding TunnelIpv6}" HorizontalAlignment="Left" MinWidth="380"/>
+        <StackPanel Orientation="Horizontal" Margin="0,4,0,8">
+          <TextBlock Text="{l:T Settings.WireGuardMtu}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+          <ComboBox ItemsSource="{Binding WireGuardMtus}" SelectedItem="{Binding WireGuardMtu}" MinWidth="120"/>
+        </StackPanel>
+        <TextBlock Text="{l:T Settings.WireGuardMtuNote}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <StackPanel Orientation="Horizontal" Margin="0,4,0,8">
+          <TextBlock Text="{l:T Settings.TunStack}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+          <ComboBox ItemsSource="{Binding TunStacks}" SelectedItem="{Binding TunStack}" MinWidth="120"/>
+        </StackPanel>
+        <!-- v0.4.28 — the audited reliability set: TUN MTU + DNS-poisoning shield + TLS fragment + mux. -->
+        <StackPanel Orientation="Horizontal" Margin="0,4,0,8">
+          <TextBlock Text="{l:T Settings.TunMtu}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+          <ComboBox ItemsSource="{Binding TunMtus}" SelectedItem="{Binding TunMtu}" MinWidth="120"/>
+        </StackPanel>
+        <TextBlock Text="{l:T Settings.TunMtuNote}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.PoisonGuard}" IsChecked="{Binding PoisonGuard}" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.PoisonGuardNote}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.TlsFragment}" IsChecked="{Binding TlsFragment}" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.TlsFragmentNote}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.Mux}" IsChecked="{Binding Mux}" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.MuxNote}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.StrictRoute}" IsChecked="{Binding StrictRoute}" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.TunCompatNote}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <TextBlock Text="{l:T Settings.StrictOffNote}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <ProgressBar Value="{Binding DownloadProgress}" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" Margin="0,4,0,8"/>
+        <TextBlock Text="{l:T Settings.EnginesNote}" Style="{StaticResource Subtle}"/>
+        <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource AccentBrush}"/>
+      </StackPanel>
+    </Border>
+
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{l:T Settings.General}" Style="{StaticResource CardTitle}"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.Tray}" IsChecked="{Binding MinimizeToTray}" HorizontalAlignment="Left" MinWidth="380"/>
+        <!-- v0.4.24 — the sound card rebuilt per the approved list: master switch + volume slider + one picker
+             row per audible event (connect / disconnect / error). Each row: preset combo + ▶ test button +
+             custom .wav/.mp3 file button. Exactly three sounds exist now — connecting/reconnecting/
+             disconnecting/unstable are silent (fixes the v0.4.23 double-disconnect and unstable=connect bugs). -->
+        <Border CornerRadius="12" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12,10" Margin="0,10,0,0">
+          <StackPanel>
+            <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.Sounds}" IsChecked="{Binding Sounds}" HorizontalAlignment="Left"/>
+            <DockPanel Margin="0,8,0,2">
+              <TextBlock Text="{l:T Settings.SoundsVolume}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+              <TextBlock DockPanel.Dock="Right" Text="{Binding SoundVolume, StringFormat={}{0:0}}" Width="34" VerticalAlignment="Center" Style="{StaticResource Latin}" FontWeight="SemiBold"/>
+              <Slider Minimum="0" Maximum="100" Value="{Binding SoundVolume}" VerticalAlignment="Center" IsMoveToPointEnabled="True" SmallChange="5" LargeChange="10" FlowDirection="LeftToRight"/>
+            </DockPanel>
+            <TextBlock Text="{l:T Settings.SoundsVolumeHint}" Style="{StaticResource Subtle}" FontSize="11" Margin="0,0,0,6"/>
+
+            <ItemsControl ItemsSource="{Binding SoundRows}" Margin="0,2" Focusable="False">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="13" Foreground="{Binding IconBrush}" Margin="0,0,8,0"/>
+                      <TextBlock Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <ComboBox Grid.Column="1" ItemsSource="{Binding Options}" SelectedItem="{Binding Selected}" DisplayMemberPath="Label" Margin="0,0,8,0" MinWidth="130"/>
+                    <Button Grid.Column="2" Command="{Binding DataContext.PlaySoundCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding EventName}" Content="&#xE768;" Style="{StaticResource IconButton}" ToolTip="{l:T Settings.SoundTest}" Margin="0,0,4,0"/>
+                    <Button Grid.Column="3" Command="{Binding DataContext.PickSoundFileCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding EventName}" Content="&#xE8E5;" Style="{StaticResource IconButton}" ToolTip="{l:T Settings.SoundCustomPick}"/>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{l:T Settings.SoundsHint}" Style="{StaticResource Subtle}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.Startup}" IsChecked="{Binding StartWithWindows}" HorizontalAlignment="Left" Margin="0,10,0,0" MinWidth="380"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.Verbose}" IsChecked="{Binding VerboseLogs}" HorizontalAlignment="Left" MinWidth="380"/>
+        <!-- v0.4.22 (user: «تو تنظیمات هم بزارش بتونن بزنن روش دوباره هم ببینن») — replay the starter tour any time. -->
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+          <Button Content="{l:T Settings.ShowTour}" Command="{Binding ShowTourCommand}" Style="{StaticResource AccentButton}" Padding="16,6"/>
+          <TextBlock Text="{l:T Settings.ShowTourHint}" Style="{StaticResource Subtle}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- One-click backup / restore (v0.4.12): encrypted single file — settings, profiles, subscriptions, rules, DNS. -->
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{l:T Backup.Title}" Style="{StaticResource CardTitle}"/>
+        <TextBlock Text="{l:T Backup.Hint}" Style="{StaticResource Subtle}" Margin="0,0,0,10"/>
+        <StackPanel Orientation="Horizontal">
+          <Button Content="{l:T Backup.Create}" Command="{Binding BackupCommand}" Style="{StaticResource AccentButton}"/>
+          <Button Content="{l:T Backup.Restore}" Command="{Binding RestoreCommand}"/>
+        </StackPanel>
+        <TextBlock Text="{l:T Backup.Note}" Style="{StaticResource Subtle}" FontSize="11" Margin="0,8,0,0"/>
+      </StackPanel>
+    </Border>
+  </StackPanel></ScrollViewer>
+</UserControl>
