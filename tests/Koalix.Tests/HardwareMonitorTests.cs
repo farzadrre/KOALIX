@@ -113,6 +113,24 @@ public class HardwareMonitorTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void Gpu_load_is_busiest_engine_not_sum_of_all_engines()
+    {
+        const string L = "luid_0x00000000_0x0000C2F3";
+        var r = HardwareMonitor.AggregateGpuLoad(
+        [
+            ($"pid_10_{L}_phys_0_eng_0_engtype_3D", 30), // game
+            ($"pid_20_{L}_phys_0_eng_0_engtype_3D", 15), // dwm on the same engine → adds
+            ($"pid_10_{L}_phys_0_eng_5_engtype_3D", 40), // a second 3D engine → max, not sum
+            ("pid_30_luid_0x00000000_0x0000AAAA_phys_0_eng_0_engtype_3D", 80),
+            ($"pid_40_{L}_phys_0_eng_9_engtype_3D", 250), // driver glitch → clamped
+        ]);
+        Assert.Equal(100, r["luid_0x00000000_0x0000c2f3"]);
+        Assert.Equal(80, r["luid_0x00000000_0x0000aaaa"]);
+        var r2 = HardwareMonitor.AggregateGpuLoad([($"pid_10_{L}_phys_0_eng_0_engtype_3D", 30), ($"pid_20_{L}_phys_0_eng_0_engtype_3D", 15), ($"pid_10_{L}_phys_0_eng_5_engtype_3D", 40)]);
+        Assert.Equal(45, r2["luid_0x00000000_0x0000c2f3"]);
+    }
+
+    [Fact]
     public void Live_sample_never_throws()
     {
         using var hw = new HardwareMonitor();

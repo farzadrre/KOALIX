@@ -49,6 +49,11 @@ public sealed partial class CountryRow : ObservableObject
     /// <summary>"{0} سرور" / "{0} servers" — localized in the view model (the loc indexer only resolves keys).</summary>
     public string CountText { get; init; } = "";
     public string Best { get; init; } = "";
+    /// <summary>v0.4.40 — best measured ping in ms (null = none measured): colours the world-map pin.</summary>
+    public double? BestMs { get; init; }
+    /// <summary>v0.4.40 (user: «وقتی میزنیم رو پرچما سرور هاش بالا بیاد بشه انتخاب کرد») — the servers of this
+    /// country, fastest measured first; the map/flag click opens them in a picker.</summary>
+    public IReadOnlyList<ProfileRow> Servers { get; init; } = [];
 }
 
 public sealed partial class DashboardViewModel : PageViewModel
@@ -376,15 +381,61 @@ public sealed partial class DashboardViewModel : PageViewModel
                     .DefaultIfEmpty(double.NaN).Min();
                 var bestText = double.IsNaN(best) ? "" : L.Format("Geo.BestFmt", best.ToString("0"));
                 var title = L.Language == "fa" && Services.GeoNames.Fa.TryGetValue(g.Key, out var fa) ? fa : g.Key;
-                return new CountryRow { Code = g.Key, Title = title, Count = g.Count(), CountText = L.Format("Geo.ServersFmt", g.Count()), Best = bestText };
+                return new CountryRow { Code = g.Key, Title = title, Count = g.Count(), CountText = L.Format("Geo.ServersFmt", g.Count()), Best = bestText,
+                    BestMs = double.IsNaN(best) ? null : best, Servers = ByPing(g.Select(x => x.Row)) };
             })
             .OrderByDescending(r => r.Count)
             .ToList();
         var unknown = _allRows.Count - rows.Sum(r => r.Count);
-        if (unknown > 0) rows.Add(new CountryRow { Code = "", Title = L["Geo.Unknown"], Count = unknown, CountText = L.Format("Geo.ServersFmt", unknown) });
+        if (unknown > 0)
+        {
+            var rest = _allRows.Where(r => Koalix.Infrastructure.ServerCountry.FromName(r.Name) is null);
+            rows.Add(new CountryRow { Code = "", Title = L["Geo.Unknown"], Count = unknown, CountText = L.Format("Geo.ServersFmt", unknown), Servers = ByPing(rest) });
+        }
+        var open = PickedCountry?.Code;
         CountryRows.Clear();
         foreach (var r in rows) CountryRows.Add(r);
         HasCountryRows = CountryRows.Count > 0 && _allRows.Count > 1;
+        // keep an open picker alive across a refresh (e.g. a ping sweep finishing while it is open)
+        if (open is not null) { PickedCountry = CountryRows.FirstOrDefault(r => r.Code == open); if (PickedCountry is null) CountryPickerOpen = false; }
+    }
+
+    private static List<ProfileRow> ByPing(IEnumerable<ProfileRow> rows) =>
+        rows.Select(r => (Row: r, Ms: double.TryParse(r.Ping, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : (double?)null))
+            .OrderBy(x => x.Ms is null ? 1 : 0).ThenBy(x => x.Ms ?? 0).ThenBy(x => x.Row.Name, StringComparer.CurrentCultureIgnoreCase).Select(x => x.Row).ToList();
+
+    /// <summary>v0.4.40 — the country whose servers the picker shows (map pin or flag chip click).</summary>
+    [ObservableProperty] private CountryRow? _pickedCountry;
+    [ObservableProperty] private bool _countryPickerOpen;
+
+    [RelayCommand]
+    private void OpenCountry(CountryRow? row)
+    {
+        if (row is null || row.Servers.Count == 0) return;
+        PickedCountry = row;
+        CountryPickerOpen = false; // re-open so the popup re-anchors at the new mouse point
+        CountryPickerOpen = true;
+    }
+
+    [RelayCommand] private void CloseCountryPicker() => CountryPickerOpen = false;
+
+    /// <summary>Row click in the picker: select that server (same as clicking its card).</summary>
+    [RelayCommand]
+    private void PickCountryServer(ProfileRow? row)
+    {
+        if (row is null) return;
+        var target = Profiles.FirstOrDefault(r => r.Profile?.Id == row.Profile?.Id) ?? row;
+        SelectProfile(target);
+        CountryPickerOpen = false;
+    }
+
+    /// <summary>Connect button in the picker: select and connect right away.</summary>
+    [RelayCommand]
+    private async Task ConnectCountryServerAsync(ProfileRow? row)
+    {
+        if (row?.Profile is null) return;
+        CountryPickerOpen = false;
+        await ConnectToAsync(row.Profile);
     }
 
     public ObservableCollection<CountryRow> CountryRows { get; } = [];
@@ -791,6 +842,7 @@ public sealed partial class DashboardViewModel : PageViewModel
             var ok = results.Count(r => r.Ms is not null);
             StatusMessage = L.Format("Profiles.TestReport", ok, results.Count);
             SortProfiles(SelectedProfile?.Profile.Id);
+            BuildCountryMap(); // v0.4.40: the map pins recolour with the fresh best pings
             RefreshAutoTexts(); // the auto card's "fastest: …" line follows new measurements (v0.4.6)
         }
         catch (OperationCanceledException)

@@ -562,19 +562,30 @@
                  a one-line hint so the keyboard navigation is discoverable. -->
             <TextBlock Text="{l:T Dash.WasdHint}" Style="{StaticResource Subtle}" FontSize="11" Margin="2,6,0,0"/>
 
-            <!-- v0.4.23 (suggestion #6, user: «نقشهٔ جغرافیایی سرورها — یک نگاه کلی روی موقعیت‌ها»):
-                 the whole fleet grouped by country, flags included, best measured ping per country. -->
+            <!-- v0.4.23 (suggestion #6) → v0.4.40 (user: «نقشه جهان باشه و سرورارو نشون بده ... با انیمیشن و موشن مخصوص خودش» /
+                 «وقتی میزنیم رو پرچما سرور هاش بالا بیاد بشه انتخاب کرد»): a living world map (pins per country, coloured by best
+                 ping, route comet while connected) + the flag chips; both open the country's server picker. -->
             <Border Style="{StaticResource Card}" Margin="0,10,0,0" Visibility="{Binding HasCountryRows, Converter={StaticResource BoolToVis}}">
               <StackPanel>
                 <DockPanel Margin="0,0,0,8">
                   <TextBlock DockPanel.Dock="Right" Text="{l:T Dash.ServerMapHint}" Style="{StaticResource Subtle}" FontSize="11" VerticalAlignment="Center" TextWrapping="NoWrap"/>
                   <TextBlock Text="{l:T Dash.ServerMap}" Style="{StaticResource CardTitle}" c:CardFold.Key="map" Margin="0" VerticalAlignment="Center"/>
                 </DockPanel>
+                <Border CornerRadius="12" Background="{DynamicResource InputBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="8,10" Margin="0,0,0,10" ClipToBounds="True">
+                  <c:WorldMap Countries="{Binding CountryRows}" CountryCommand="{Binding OpenCountryCommand}"
+                              ActiveCode="{Binding TunnelGeo.Code, FallbackValue={x:Null}}"
+                              SelectedCode="{Binding SelectedProfile.CountryCode, FallbackValue={x:Null}}"/>
+                </Border>
                 <ItemsControl ItemsSource="{Binding CountryRows}">
                   <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                      <Border CornerRadius="11" Background="{DynamicResource InputBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="11,8" Margin="0,0,8,8" ToolTip="{Binding Title}">
+                      <Border x:Name="chip" CornerRadius="11" Background="{DynamicResource InputBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="11,8" Margin="0,0,8,8"
+                              ToolTip="{Binding Title}" Cursor="Hand" RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform><ScaleTransform x:Name="sc"/></Border.RenderTransform>
+                        <Border.InputBindings>
+                          <MouseBinding MouseAction="LeftClick" Command="{Binding DataContext.OpenCountryCommand, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}" CommandParameter="{Binding}"/>
+                        </Border.InputBindings>
                         <StackPanel Orientation="Horizontal">
                           <c:FlagBox Code="{Binding Code}" Width="30" Height="21" VerticalAlignment="Center"/>
                           <StackPanel Margin="9,0,0,0" VerticalAlignment="Center">
@@ -584,11 +595,80 @@
                               <TextBlock Text="{Binding Best}" FontSize="11" Foreground="{DynamicResource SuccessBrush}" Margin="7,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight" TextWrapping="NoWrap"/>
                             </StackPanel>
                           </StackPanel>
+                          <TextBlock Text="&#xE70D;" Style="{StaticResource Icon}" FontSize="10" Margin="9,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SubtleTextBrush}"/>
                         </StackPanel>
                       </Border>
+                      <DataTemplate.Triggers>
+                        <Trigger SourceName="chip" Property="IsMouseOver" Value="True">
+                          <Setter TargetName="chip" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
+                          <Setter TargetName="chip" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                          <Trigger.EnterActions>
+                            <BeginStoryboard><Storyboard>
+                              <DoubleAnimation Storyboard.TargetName="sc" Storyboard.TargetProperty="ScaleX" To="1.04" Duration="0:0:0.16"/>
+                              <DoubleAnimation Storyboard.TargetName="sc" Storyboard.TargetProperty="ScaleY" To="1.04" Duration="0:0:0.16"/>
+                            </Storyboard></BeginStoryboard>
+                          </Trigger.EnterActions>
+                          <Trigger.ExitActions>
+                            <BeginStoryboard><Storyboard>
+                              <DoubleAnimation Storyboard.TargetName="sc" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.2"/>
+                              <DoubleAnimation Storyboard.TargetName="sc" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.2"/>
+                            </Storyboard></BeginStoryboard>
+                          </Trigger.ExitActions>
+                        </Trigger>
+                      </DataTemplate.Triggers>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <!-- Country server picker: opens at the mouse (pin or chip); click a row = select, the accent button = connect now. -->
+                <Popup IsOpen="{Binding CountryPickerOpen, Mode=TwoWay}" AllowsTransparency="True" StaysOpen="False" Placement="MousePoint" HorizontalOffset="6" VerticalOffset="6" PopupAnimation="Fade">
+                  <Border x:Name="CountryPicker" Width="360" CornerRadius="16" Background="{DynamicResource PopupBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1" Padding="16,14" Margin="8,8,24,24">
+                    <Border.Effect><DropShadowEffect BlurRadius="28" ShadowDepth="6" Opacity="0.45" Color="{DynamicResource ShadowColor}"/></Border.Effect>
+                    <StackPanel>
+                      <DockPanel Margin="0,0,0,4">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="11" Padding="7" VerticalAlignment="Top"
+                                Command="{Binding CloseCountryPickerCommand}"/>
+                        <c:FlagBox Code="{Binding PickedCountry.Code}" Width="34" Height="24" VerticalAlignment="Center"/>
+                        <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding PickedCountry.Title}" FontWeight="SemiBold" FontSize="14"/>
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding PickedCountry.CountText}" FontSize="11" Style="{StaticResource Subtle}"/>
+                            <TextBlock Text="{Binding PickedCountry.Best}" FontSize="11" Foreground="{DynamicResource SuccessBrush}" Margin="7,0,0,0" FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight"/>
+                          </StackPanel>
+                        </StackPanel>
+                      </DockPanel>
+                      <TextBlock Text="{l:T Map.PickerSub}" Style="{StaticResource Subtle}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,10"/>
+                      <ScrollViewer MaxHeight="330" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding PickedCountry.Servers}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Stretch" Padding="10,7" Background="{DynamicResource InputBrush}"
+                                        Command="{Binding DataContext.PickCountryServerCommand, ElementName=CountryPicker}" CommandParameter="{Binding}">
+                                  <Grid FlowDirection="LeftToRight">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                      <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                                      <TextBlock Text="{Binding Source}" FontSize="10.5" Style="{StaticResource Subtle}" FontFamily="{StaticResource LatinFont}"/>
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Style="{StaticResource PingBadge}" Margin="8,0,0,0">
+                                      <TextBlock Text="{Binding Ping}" Style="{StaticResource PingBadgeText}"/>
+                                    </Border>
+                                  </Grid>
+                                </Button>
+                                <Button Grid.Column="1" Style="{StaticResource AccentButton}" Margin="6,0,0,0" Padding="11,6" VerticalAlignment="Stretch" ToolTip="{l:T Map.Connect}"
+                                        Command="{Binding DataContext.ConnectCountryServerCommand, ElementName=CountryPicker}" CommandParameter="{Binding}">
+                                  <TextBlock Text="&#xE945;" Style="{StaticResource Icon}" FontSize="13"/>
+                                </Button>
+                              </Grid>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </ScrollViewer>
+                    </StackPanel>
+                  </Border>
+                </Popup>
               </StackPanel>
             </Border>
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.40 — living world map with a server picker · accurate GPU load · groups survive refresh · new defaults
+- **🗺️ World server map** (Dashboard → Server map):
+  - A dot-matrix world map with a glowing pin for every country that has servers. Pin size follows the server count; pin colour follows the best ping (green / amber / red).
+  - Motion: pins pop in, breathe with pulse rings and an accent sweep crosses the continents. The selected country has a spinning ring. While connected, a comet flies the route from home to the exit country.
+  - The camera auto-zooms to frame your fleet.
+  - **Click a pin or a flag chip** to open that country's servers, fastest first: click a row to select it, or use the button to connect at once.
+  - Pins recolour after every ping test. With visual effects off the map is still.
+- **🎮 GPU load matches the NVIDIA overlay:** on NVIDIA cards the load comes from the driver (NVAPI). Elsewhere it is the busiest GPU engine, as Task Manager shows it, not the sum of all engines, which over-reported (89% vs 46%).
+- **🗂️ Groups no longer vanish:** refreshing a subscription (manually, by auto-refresh or during a full test) used to re-add its servers without their group, so the group disappeared from the dashboard. Groups are now kept per server.
+- **⚙️ New defaults for fresh installs:** neon style, dark theme, Persian, live background and ARGB, gVisor TUN with MTU 1280, QUIC/IPv6 blocked, DNS through the tunnel, poison guard on, and the widget in OSD mode (locked, click-through). Existing settings are untouched.
+
 ## 0.4.39 — published on GitHub · automatic Windows releases · in-app updates from github.com/farzadrre/KOALIX by default
 - **🚀 GitHub releases:** pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`.
   - It runs the tests, then builds the installer (`KoalixApp-win-Setup.exe`), the single-file portable build and the Velopack update feed.

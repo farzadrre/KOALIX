@@ -89,7 +89,9 @@ public sealed class HardwareMonitor : IDisposable
                 RamUsage = ramPct,
                 RamUsedGb = usedGb,
                 RamTotalGb = totalGb,
-                GpuUsage = gpuLoad is { } g ? Math.Clamp(g, 0, 100) : null,
+                // v0.4.40 — NVIDIA's own core-load counter (the one the NVIDIA overlay shows) wins over the WDDM
+                // 3D-engine counter, which measures queued engine time and read 89 % where the overlay said 46 %.
+                GpuUsage = nv?.Load ?? (gpuLoad is { } g ? Math.Clamp(g, 0, 100) : null),
                 GpuTemp = gpu?.TempC ?? nv?.Core,
                 GpuHotspot = nv?.Hotspot,
                 GpuMemTemp = nv?.Memory,
@@ -237,9 +239,7 @@ public sealed class HardwareMonitor : IDisposable
         public PdhSample? Collect()
         {
             if (_q == IntPtr.Zero || PdhCollectQueryData(_q) != 0) return null;
-            var gpu = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (name, v) in Array(_gpu))
-                if (GpuLuid(name) is { } l) gpu[l] = gpu.GetValueOrDefault(l) + v;
+            var gpu = AggregateGpuLoad(Array(_gpu));
             var vram = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
             foreach (var (name, v) in Array(_vram))
                 if (GpuLuid(name) is { } l) vram[l] = vram.GetValueOrDefault(l) + v;
@@ -282,6 +282,28 @@ public sealed class HardwareMonitor : IDisposable
         }
 
         public void Dispose() { if (_q != IntPtr.Zero) { PdhCloseQuery(_q); _q = IntPtr.Zero; } }
+    }
+
+    /// <summary>v0.4.40 — Task Manager's method: sum the processes PER physical engine, then the busiest engine is the
+    /// adapter's load (clamped to 100). The old code summed every 3D engine of every process into one number.</summary>
+    public static Dictionary<string, double> AggregateGpuLoad(IEnumerable<(string Name, double Value)> instances)
+    {
+        var perEngine = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, v) in instances)
+        {
+            if (GpuLuid(name) is not { } l) continue;
+            var e = name.IndexOf("_phys_", StringComparison.OrdinalIgnoreCase);
+            var t = name.IndexOf("_engtype_", StringComparison.OrdinalIgnoreCase);
+            var key = l + (e >= 0 && t > e ? name[e..t].ToLowerInvariant() : "");
+            perEngine[key] = perEngine.GetValueOrDefault(key) + v;
+        }
+        var byLuid = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, v) in perEngine)
+        {
+            var l = key[..26];
+            byLuid[l] = Math.Max(byLuid.GetValueOrDefault(l), Math.Min(v, 100));
+        }
+        return byLuid;
     }
 
     /// <summary>"pid_12_luid_0x00000000_0x0000C2F3_phys_0_eng_3_engtype_3D" → "luid_0x00000000_0x0000C2F3".</summary>
@@ -392,11 +414,12 @@ public sealed class HardwareMonitor : IDisposable
 
     /* ───────────── NVAPI (NVIDIA hot spot / memory junction) ───────────── */
 
-    private sealed record NvReading(double? Core, double? Hotspot, double? Memory);
+    private sealed record NvReading(double? Core, double? Hotspot, double? Memory, double? Load);
 
     private sealed unsafe class NvApi
     {
         private delegate* unmanaged[Cdecl]<IntPtr, byte*, int> _thermal;
+        private delegate* unmanaged[Cdecl]<IntPtr, byte*, int> _pstates;
         private IntPtr _gpu;
         private uint _mask;
 
@@ -410,20 +433,22 @@ public sealed class HardwareMonitor : IDisposable
                 var init = (delegate* unmanaged[Cdecl]<int>)qi(0x0150E828);
                 var enumGpus = (delegate* unmanaged[Cdecl]<IntPtr*, int*, int>)qi(0xE5AC921F);
                 var thermal = (delegate* unmanaged[Cdecl]<IntPtr, byte*, int>)qi(0x65FE3AAD);
-                if (init == null || enumGpus == null || thermal == null || init() != 0) return null;
+                var pstates = (delegate* unmanaged[Cdecl]<IntPtr, byte*, int>)qi(0x60DED2ED); // GPU_GetDynamicPstatesInfoEx
+                if (init == null || enumGpus == null || (thermal == null && pstates == null) || init() != 0) return null;
                 var handles = stackalloc IntPtr[64];
                 int count;
                 if (enumGpus(handles, &count) != 0 || count < 1) return null;
-                var nv = new NvApi { _thermal = thermal, _gpu = handles[0] };
+                var nv = new NvApi { _thermal = thermal, _pstates = pstates, _gpu = handles[0] };
                 // Find the widest sensor mask this GPU accepts (LibreHardwareMonitor's probe).
                 uint mask = 0;
-                for (var bit = 0; bit < 32; bit++)
-                {
-                    if (nv.Query(1u << bit, out _) != 0) { mask = bit == 0 ? 0 : (1u << bit) - 1; break; }
-                    mask = bit == 31 ? uint.MaxValue : mask;
-                }
-                if (mask == 0) return null;
+                if (thermal != null)
+                    for (var bit = 0; bit < 32; bit++)
+                    {
+                        if (nv.Query(1u << bit, out _) != 0) { mask = bit == 0 ? 0 : (1u << bit) - 1; break; }
+                        mask = bit == 31 ? uint.MaxValue : mask;
+                    }
                 nv._mask = mask;
+                if (mask == 0 && nv.Load() is null) return null;
                 return nv;
             }
             catch { return null; }
@@ -442,13 +467,28 @@ public sealed class HardwareMonitor : IDisposable
             return status;
         }
 
+        /// <summary>NV_GPU_DYNAMIC_PSTATES_INFO_EX v1 (72 bytes): version, flags, 8 × {present bit, percent}; domain 0 = graphics core.</summary>
+        private double? Load()
+        {
+            if (_pstates == null) return null;
+            const int size = 72;
+            var buf = stackalloc byte[size];
+            new Span<byte>(buf, size).Clear();
+            *(uint*)buf = size | (1u << 16);
+            if (_pstates(_gpu, buf) != 0) return null;
+            if ((*(uint*)(buf + 8) & 1) == 0) return null;
+            var pct = *(uint*)(buf + 12);
+            return pct <= 100 ? pct : null;
+        }
+
         public NvReading? Read()
         {
             try
             {
-                if (Query(_mask, out var t) != 0) return null;
                 static double? C(int raw) { var c = raw / 256.0; return c is > 1 and < 150 ? Math.Round(c, 1) : null; }
-                return new NvReading(C(t[0]), C(t[1]), C(t[9]));
+                var load = Load();
+                if (_mask == 0 || Query(_mask, out var t) != 0) return load is null ? null : new NvReading(null, null, null, load);
+                return new NvReading(C(t[0]), C(t[1]), C(t[9]), load);
             }
             catch { return null; }
         }

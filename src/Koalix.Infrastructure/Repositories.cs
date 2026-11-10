@@ -7,11 +7,49 @@ namespace Koalix.Infrastructure;
 
 public sealed class SettingsRepository(Database db)
 {
+    /// <summary>v0.4.40 — shipped defaults (the user's own tuned setup, «میخوام تنظیمات دیفالت اپ این باشه»). A key the
+    /// user never saved reads as this value; anything they change is stored and wins. Personal data (profiles, gaming
+    /// paths, widget position) is deliberately NOT here. split.mode stays FullTunnel: Include with no apps can't connect.</summary>
+    public static readonly IReadOnlyDictionary<string, string> Defaults = new Dictionary<string, string>
+    {
+        ["dash.sort"] = "Protocol",
+        ["net.poisonGuard"] = "1",
+        ["route.blockQuic"] = "1",
+        ["route.iranDirect"] = "0",
+        ["split.blockIpv6"] = "1",
+        ["split.tunnelDns"] = "1",
+        ["tun.mtu"] = "1280",
+        ["tun.stack"] = "gvisor",
+        ["tun.strict"] = "0",
+        ["tun.strict.migrated"] = "1",
+        ["ui.accent"] = "#FF7C5CFF",
+        ["ui.argb"] = "1",
+        ["ui.argb.reactive"] = "speed",
+        ["ui.backdrop"] = "None",
+        ["ui.connectShape"] = "circle",
+        ["ui.effects"] = "1",
+        ["ui.glass"] = "0",
+        ["ui.language"] = "fa",
+        ["ui.liveBg"] = "1",
+        ["ui.sounds.connect"] = "rise",
+        ["ui.sounds.disconnect"] = "bye",
+        ["ui.sounds.error"] = "buzz",
+        ["ui.sounds.focuson"] = "glass",
+        ["ui.sounds.reconnecting"] = "pulse",
+        ["ui.style"] = "neon",
+        ["ui.theme"] = "Dark",
+        ["vpn.killForeign"] = "1",
+        ["widget.clickThrough"] = "1",
+        ["widget.locked"] = "1",
+        ["widget.mode"] = "osd",
+        ["widget.opacity"] = "0.63",
+    };
+
     public string? Get(string key)
     {
         using var c = db.Open(); using var cmd = c.CreateCommand();
         cmd.CommandText = "SELECT value FROM settings WHERE key=$k"; cmd.Parameters.AddWithValue("$k", key);
-        return cmd.ExecuteScalar() as string;
+        return cmd.ExecuteScalar() as string ?? Defaults.GetValueOrDefault(key);
     }
     public void Set(string key, string value)
     {

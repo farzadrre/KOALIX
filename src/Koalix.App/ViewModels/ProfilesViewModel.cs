@@ -535,7 +535,20 @@ public sealed partial class ProfilesViewModel : PageViewModel
     {
         if (!_subsRepo.Exists(subId)) return -1; // deleted while we were downloading — never resurrect its servers
         if (r.Links.Nodes.Count == 0) return -1;  // empty/failed feed — keep the old servers instead of wiping them
-        foreach (var old in _repo.BySubscription(subId)) _repo.Delete(old.Id);
+        // v0.4.40 (user: «گروهی که میسازم … حذف میشه ولی کانفیگاش هنوز هست تو قسمت همه») — a refresh deletes and
+        // re-adds the sub's servers, and the re-added rows came back WITHOUT the group the user had put them in
+        // (auto-refresh on app open does this silently). Remember each old server's group by its link/name.
+        var oldNodes = _repo.BySubscription(subId);
+        var tagByLink = new Dictionary<string, string>(StringComparer.Ordinal);
+        var tagByName = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var o in oldNodes.Where(o => !string.IsNullOrWhiteSpace(o.Tag)))
+        {
+            tagByLink.TryAdd(o.Content, o.Tag!);
+            tagByName.TryAdd(o.Name, o.Tag!);
+        }
+        var oldTags = oldNodes.Select(o => o.Tag?.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var wholeSubTag = oldTags.Count == 1 && !string.IsNullOrWhiteSpace(oldTags[0]) ? oldTags[0] : null; // whole sub was one group
+        foreach (var old in oldNodes) _repo.Delete(old.Id);
         var engine = preferredEngine ?? _subsRepo.All().FirstOrDefault(s => s.Id == subId)?.Engine; // saved choice sticks
         // v0.4.23 migration: subscriptions saved under the OLD auto-detect carry SingBox for plain share links;
         // per the new rule (links → Xray, only JSON → sing-box) one refresh moves them over, so existing subs get
@@ -546,6 +559,12 @@ public sealed partial class ProfilesViewModel : PageViewModel
             _subsRepo.SetEngine(subId, EngineKind.Xray);
         }
         var n = AddNodes(r.Links.Nodes, subId, tag, engine);
+        if (string.IsNullOrWhiteSpace(tag) && (tagByLink.Count > 0 || wholeSubTag is not null))
+            foreach (var p in _repo.BySubscription(subId))
+            {
+                var keep = tagByLink.GetValueOrDefault(p.Content) ?? tagByName.GetValueOrDefault(p.Name) ?? wholeSubTag;
+                if (keep is not null) _repo.SetTag(p.Id, keep);
+            }
         if (r.Info is { } info) _subsRepo.SetInfo(subId, info);
         _subsRepo.SetLastUpdate(subId);
         // v0.4.22: skipped placeholder rows (0.0.0.0:1 ads/volume reminders) are reported, not silently dropped.
