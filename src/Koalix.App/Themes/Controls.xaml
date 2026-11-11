@@ -480,14 +480,14 @@
                     <Grid>
                         <Border x:Name="PART_Track" CornerRadius="3" Background="{TemplateBinding Background}"/>
                         <Border x:Name="PART_Indicator" CornerRadius="3" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left" ClipToBounds="True">
-                            <Rectangle IsHitTestVisible="False">
+                            <Rectangle x:Name="Sheen" IsHitTestVisible="False">
                                 <Rectangle.Fill>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                         <GradientStop Color="Transparent" Offset="0.18"/>
                                         <GradientStop Color="#66FFFFFF" Offset="0.46"/>
                                         <GradientStop Color="Transparent" Offset="0.74"/>
                                         <LinearGradientBrush.RelativeTransform>
-                                            <TranslateTransform x:Name="Sheen"/>
+                                            <TranslateTransform/>
                                         </LinearGradientBrush.RelativeTransform>
                                     </LinearGradientBrush>
                                 </Rectangle.Fill>
@@ -498,7 +498,7 @@
                         <EventTrigger RoutedEvent="Loaded">
                             <BeginStoryboard>
                                 <Storyboard RepeatBehavior="Forever">
-                                    <DoubleAnimation Storyboard.TargetName="Sheen" Storyboard.TargetProperty="X" From="-1.1" To="1.1" Duration="0:0:2.9"/>
+                                    <DoubleAnimation Storyboard.TargetName="Sheen" Storyboard.TargetProperty="(Shape.Fill).(Brush.RelativeTransform).(TranslateTransform.X)" From="-1.1" To="1.1" Duration="0:0:2.9"/>
                                 </Storyboard>
                             </BeginStoryboard>
                         </EventTrigger>

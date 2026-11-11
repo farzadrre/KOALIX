@@ -62,21 +62,17 @@ public sealed class FlagBox : Grid
 
     private void UpdateToolTip() => ToolTip = string.IsNullOrWhiteSpace(Country) ? null : $"{Country}{(Code.Length == 2 ? $" ({Code.ToUpperInvariant()})" : "")}";
 
-    private void Reload()
+    /// <summary>v0.4.41 — returns the embedded (or disk-cached) flag bitmap for direct DrawingContext rendering (e.g. WorldMap).</summary>
+    public static BitmapSource? TryGetBitmap(string? code)
     {
-        var code = (Code ?? "").Trim().ToUpperInvariant();
-        _img.Visibility = Visibility.Collapsed;
-        _fallback.Visibility = Visibility.Visible;
-        // Windows has no flag emoji glyphs — a bold ISO code badge is the honest, always-readable fallback.
-        _fallback.Text = code.Length == 2 ? code : "";
-        if (code.Length != 2 || ActualWidth < 4) return; // Reload() runs again from Loaded once laid out
-
-        // 1) Embedded pack — instant, offline, always ships with the app (v0.4.12).
-        var embedded = Embedded.GetOrAdd(code, static c =>
+        var c = (code ?? "").Trim().ToUpperInvariant();
+        if (c == "UK") c = "GB";
+        if (c.Length != 2) return null;
+        var embedded = Embedded.GetOrAdd(c, static k =>
         {
             try
             {
-                var src = Application.GetResourceStream(new Uri($"pack://application:,,,/KOALIX;component/Assets/Flags/{c}.png"));
+                var src = Application.GetResourceStream(new Uri($"pack://application:,,,/KOALIX;component/Assets/Flags/{k}.png"));
                 if (src is null) return null!;
                 var bmp = new BitmapImage();
                 using (var s = src.Stream) { bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.StreamSource = s; bmp.EndInit(); }
@@ -85,7 +81,23 @@ public sealed class FlagBox : Grid
             }
             catch { return null!; }
         });
-        if (embedded is not null) { Show(embedded); return; }
+        if (embedded is not null) return embedded;
+        var path = FlagPath(c);
+        return File.Exists(path) ? Load(path) : null;
+    }
+
+    private void Reload()
+    {
+        var code = (Code ?? "").Trim().ToUpperInvariant();
+        if (code == "UK") code = "GB";
+        _img.Visibility = Visibility.Collapsed;
+        _fallback.Visibility = Visibility.Visible;
+        // Windows has no flag emoji glyphs — a bold ISO code badge is the honest, always-readable fallback.
+        _fallback.Text = code.Length == 2 ? code : "";
+        if (code.Length != 2 || ActualWidth < 4) return; // Reload() runs again from Loaded once laid out
+
+        // 1) Embedded pack — instant, offline, always ships with the app (v0.4.12).
+        if (TryGetBitmap(code) is { } embedded) { Show(embedded); return; }
 
         // 2) Disk cache from a previous run, 3) network download for codes missing from the pack.
         var path = FlagPath(code);

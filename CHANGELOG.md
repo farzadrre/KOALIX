@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.41 — 3D orthographic globe & holographic server map · glassmorphic wave ConnectOrb · Fluent Reveal spotlight · rolling odometer metrics · sidebar live telemetry footer
+- **🗺️ Server Map Overhaul + 3D Orthographic Globe Mode** (Dashboard → Server map):
+  - **2D / 3D Orthographic Globe Switch:** toggle seamlessly between the flat 2D cartographic map and a rotatable 3D Orthographic Globe (with backface culling, depth-shaded continent dots, spherical graticule, 3D orbital flight arcs, and mouse drag rotation).
+  - **Two-tone holographic continents & graticule grid:** coastal land dots render crisper and brighter than inland dots, layered over a deep ocean atmosphere glow and dashed latitude/longitude graticule lines (`60°N`, `30°N`, `0°`, `30°S`).
+  - **Interactive Zoom, Pan & HUD controls:** zoom with the mouse scroll wheel (`1.0×`–`3.5×` anchored toward the cursor), drag to pan/rotate across the globe, or use the on-canvas `+` / `−` / `2D-3D` / `Reset` HUD buttons in the top-left corner.
+  - **Region Camera Filters (`All` / `Europe` / `Asia` / `Americas`):** one click glides the camera (in both 2D and 3D modes) to frame that region's servers.
+  - **Anti-overlap pin separation:** closely clustered European countries (`DE`, `NL`, `FR`, `GB`, `CH`, `AT`, `FI`, `SE`…) automatically separate so pins never collide, with crisp leader lines back to their true geographic centroids.
+  - **Global network mesh & flight telemetry:** faint mesh arcs connect home (`IR`) to all server countries; the active/preview route renders a ground shadow chord, dual-comet packet stream, and a floating mid-arc latency pill (`IR ➔ DE · 98 ms`).
+  - **Rich hover card & two-way flag strip sync:** hovering a pin or a country flag chip below the map highlights the route and opens an on-map glassmorphic card with the embedded country flag, server count, best ping, and fastest server name. Double-clicking any pin immediately connects to that country's fastest server.
+  - **Upgraded Country Flag Chips & Country Picker:** chips now sort fastest-first, display a `★` crown for the fastest country, a bottom ping-quality bar, and a quick-connect `⚡` button; the country popup adds **Connect fastest** and **Test ping** actions plus protocol/engine chips on every server row.
+- **🌊 Glassmorphic ConnectOrb & Live Sine-Wave Energy Liquid:**
+  - Replaced the harsh opaque neon green-purple core block with a theme-harmonized glassmorphic surface that blends the current theme's base surface with harmonious state colors (emerald-cyan when connected, accent when idle/connecting, amber when degraded, crimson on error) and animates every color transition smoothly over `380 ms`.
+  - Added dual layered sine-wave energy liquid inside `ConnectOrb` whose fill height and wave speed respond in real time to live download traffic.
+- **✨ Windows 11 Fluent Reveal Cursor Spotlight (`Fx.HoverGlow`):**
+  - Moving the mouse across Dashboard cards, Server cards, Quick Switch tiles, Country Flag chips, or the Sidebar footer illuminates the glass borders around the cursor with a specular radial spotlight while preserving exact pre-hover bindings/resources on leave.
+- **🔢 Rolling Odometer Numbers (`Fx.RollValue`):**
+  - Dashboard and Sidebar telemetry numbers (Latency, Download speed, Upload speed) smoothly interpolate numeric digits and glide with a directional vertical odometer roll instead of jumping abruptly.
+- **📡 Smart Sidebar Mini Telemetry Footer (`MainWindow`):**
+  - Upgraded the bottom sidebar status card with the active tunnel country flag, a one-click Connect/Disconnect button, live rolling Ping and Download speed readouts, and a live flowing mini download `Sparkline` visible across all pages.
+- **🛠️ Field-Log Stability Fixes (`koalix-20261111.log`):**
+  - Fixed a `System.InvalidOperationException` (`'Sheen' name cannot be found in the name scope of 'System.Windows.Controls.ControlTemplate'`) when instantiating implicit `ProgressBar` and country-chip `ScaleTransform` templates, and added a static regression guard in `XamlIntegrityTests`.
+  - **Foreign VPN killer (`KillForeignVpnClients`):** Windows services such as `LanternSvc` are now cleanly stopped via `sc.exe stop` before fallback termination so Windows Service Control Manager (SCM) does not auto-respawn them 2 seconds later and flood the TUN adapter.
+
 ## 0.4.40 — living world map with a server picker · accurate GPU load · groups survive refresh · new defaults
 - **🗺️ World server map** (Dashboard → Server map):
   - A dot-matrix world map with a glowing pin for every country that has servers. Pin size follows the server count; pin colour follows the best ping (green / amber / red).

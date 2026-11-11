@@ -39,8 +39,8 @@ public sealed partial class GroupChip : ObservableObject
     [ObservableProperty] private bool _isSelectedChip;
 }
 
-/// <summary>v0.4.23 (suggestion #6) — one country row of the dashboard "server map" card: flag, localized name,
-/// how many servers live there and the best measured ping among them (empty when none was measured yet).</summary>
+/// <summary>v0.4.23/v0.4.41 — one country row of the dashboard "server map" card: flag, localized name,
+/// how many servers live there, best measured ping, quality level/bar, and live active/selected/hover states.</summary>
 public sealed partial class CountryRow : ObservableObject
 {
     public string Code { get; init; } = "";
@@ -51,6 +51,17 @@ public sealed partial class CountryRow : ObservableObject
     public string Best { get; init; } = "";
     /// <summary>v0.4.40 — best measured ping in ms (null = none measured): colours the world-map pin.</summary>
     public double? BestMs { get; init; }
+    /// <summary>v0.4.41 — 0 = unmeasured, 1 = good (&lt;300ms), 2 = warn (&lt;800ms), 3 = slow (≥800ms).</summary>
+    public int PingLevel { get; init; }
+    /// <summary>v0.4.41 — 0.0..1.0 quality ratio for the bottom progress bar on each country chip.</summary>
+    public double QualityRatio { get; init; }
+    /// <summary>v0.4.41 — true when this country has the fastest overall server in the fleet.</summary>
+    public bool IsBestCountry { get; init; }
+    /// <summary>v0.4.41 — name of the fastest server in this country (shown in the map hover card).</summary>
+    public string BestServerName { get; init; } = "";
+    [ObservableProperty] private bool _isActiveCountry;
+    [ObservableProperty] private bool _isSelectedCountry;
+    [ObservableProperty] private bool _isHoveredCountry;
     /// <summary>v0.4.40 (user: «وقتی میزنیم رو پرچما سرور هاش بالا بیاد بشه انتخاب کرد») — the servers of this
     /// country, fastest measured first; the map/flag click opens them in a picker.</summary>
     public IReadOnlyList<ProfileRow> Servers { get; init; } = [];
@@ -134,6 +145,7 @@ public sealed partial class DashboardViewModel : PageViewModel
     [ObservableProperty] private string _latency = "—";
     [ObservableProperty] private string _upload = "0 B/s";
     [ObservableProperty] private string _download = "0 B/s";
+    [ObservableProperty] private double _orbActivity;
     [ObservableProperty] private string _sessionTraffic = "";
     /// <summary>Today/this-week usage next to the session totals (v0.4.11) — "امروز ↓… • هفته ↓…".</summary>
     [ObservableProperty] private string _usageSummary = "";
@@ -184,7 +196,13 @@ public sealed partial class DashboardViewModel : PageViewModel
     public string TunnelGeoText => GeoText(TunnelGeo);
     private string GeoText(GeoInfo? g) => g is null ? "" : L.Language == "fa" && Services.GeoNames.Fa.TryGetValue(g.Code, out var fa) ? fa : g.Country;
     partial void OnDirectGeoChanged(GeoInfo? value) { OnPropertyChanged(nameof(HasDirectGeo)); OnPropertyChanged(nameof(DirectFlag)); OnPropertyChanged(nameof(DirectGeoText)); }
-    partial void OnTunnelGeoChanged(GeoInfo? value) { OnPropertyChanged(nameof(HasTunnelGeo)); OnPropertyChanged(nameof(TunnelFlag)); OnPropertyChanged(nameof(TunnelGeoText)); }
+    partial void OnTunnelGeoChanged(GeoInfo? value)
+    {
+        OnPropertyChanged(nameof(HasTunnelGeo));
+        OnPropertyChanged(nameof(TunnelFlag));
+        OnPropertyChanged(nameof(TunnelGeoText));
+        SyncCountryStates();
+    }
 
     /// <summary>The server the auto card currently points at (localized display name for the hero, v0.4.6).</summary>
     public string AutoPickName => _autoRow?.AutoPick ?? "";
@@ -237,6 +255,7 @@ public sealed partial class DashboardViewModel : PageViewModel
         System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += (_, _) => Ui(CheckForeignVpn);
         L.LanguageChanged += UpdateHero;
         L.LanguageChanged += () => Ui(RefreshAutoTexts);
+        L.LanguageChanged += () => Ui(BuildCountryMap);
         L.LanguageChanged += () => _ = LoadUsageCardAsync(); // the usage card is fully localized (v0.4.15)
         _failoverTimer.Tick += (_, _) => _ = AutoFailoverAsync(false);
         _syncQuick = true;
@@ -284,7 +303,24 @@ public sealed partial class DashboardViewModel : PageViewModel
                 try
                 {
                     using var p = Process.GetProcessById(pid);
-                    p.Kill(entireProcessTree: true);
+                    // v0.4.41 (field log koalix-20261111): services like LanternSvc auto-restart via Windows SCM when
+                    // terminated with Process.Kill, respawning 2 seconds later and flooding the TUN adapter. Stopping
+                    // the service cleanly via sc.exe first marks it SERVICE_STOPPED so SCM does not respawn it.
+                    if (ProcessRunner.IsElevated)
+                    {
+                        try
+                        {
+                            using var sc = Process.Start(new ProcessStartInfo("sc.exe", $"stop \"{name}\"")
+                            {
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            });
+                            sc?.WaitForExit(1500);
+                            p.WaitForExit(1500);
+                        }
+                        catch { /* not a service or stop refused — fall through to Kill */ }
+                    }
+                    if (!p.HasExited) p.Kill(entireProcessTree: true);
                     AppHost.Log(LogCategory.Application, $"Kill-foreign: closed {name} (PID {pid}) before connecting", Serilog.Events.LogEventLevel.Warning);
                 }
                 catch (Exception ex) { AppHost.Log(LogCategory.Application, $"Kill-foreign: could not close {name} (PID {pid}): {Redactor.Redact(ex.Message)}"); }
@@ -315,6 +351,7 @@ public sealed partial class DashboardViewModel : PageViewModel
     partial void OnSelectedProfileChanged(ProfileRow? value)
     {
         foreach (var r in Profiles) r.IsSelected = r == value;
+        SyncCountryStates();
         UpdateHero();
     }
 
@@ -362,47 +399,139 @@ public sealed partial class DashboardViewModel : PageViewModel
     }
 
     /// <summary>
-    /// v0.4.23 (suggestion #6, user: «نقشهٔ جغرافیایی سرورها — پرچم‌ها که داریم؛ یک نگاه کلی روی موقعیت‌ها»):
-    /// groups the server cards by country (from the flag emoji / ISO token in their names) — one glance shows
-    /// where the fleet lives and which country is fastest. Best ping = the last measured value, honest and
-    /// stale-safe: countries with no measurement just show the count.
+    /// v0.4.23/v0.4.41 — groups the server cards by country (from the flag emoji / ISO token in their names) with
+    /// localized country names in both Persian &amp; English, ping quality levels, fastest-country crown, and region filters.
     /// </summary>
     private void BuildCountryMap()
     {
-        var rows = _allRows
+        var grouped = _allRows
             .Select(r => (Row: r, Code: Koalix.Infrastructure.ServerCountry.FromName(r.Name)))
             .Where(x => x.Code is not null)
-            .GroupBy(x => x.Code!)
+            .GroupBy(x => x.Code!, StringComparer.OrdinalIgnoreCase)
             .Select(g =>
             {
+                var ordered = ByPing(g.Select(x => x.Row));
                 var best = g.Select(x => x.Row)
                     .Where(r => double.TryParse(r.Ping, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _))
                     .Select(r => double.Parse(r.Ping, System.Globalization.CultureInfo.InvariantCulture))
                     .DefaultIfEmpty(double.NaN).Min();
-                var bestText = double.IsNaN(best) ? "" : L.Format("Geo.BestFmt", best.ToString("0"));
-                var title = L.Language == "fa" && Services.GeoNames.Fa.TryGetValue(g.Key, out var fa) ? fa : g.Key;
-                return new CountryRow { Code = g.Key, Title = title, Count = g.Count(), CountText = L.Format("Geo.ServersFmt", g.Count()), Best = bestText,
-                    BestMs = double.IsNaN(best) ? null : best, Servers = ByPing(g.Select(x => x.Row)) };
+                double? bestMs = double.IsNaN(best) ? null : best;
+                return (Code: g.Key.ToUpperInvariant(), Count: g.Count(), BestMs: bestMs, Servers: ordered);
             })
-            .OrderByDescending(r => r.Count)
+            .OrderBy(x => x.BestMs is null ? 1 : 0)
+            .ThenBy(x => x.BestMs ?? double.MaxValue)
+            .ThenByDescending(x => x.Count)
             .ToList();
+
+        var overallBestCode = grouped.Where(x => x.BestMs is not null).OrderBy(x => x.BestMs!.Value).Select(x => x.Code).FirstOrDefault();
+
+        var rows = grouped.Select(g =>
+        {
+            var bestText = g.BestMs is { } b ? L.Format("Geo.BestFmt", b.ToString("0")) : "";
+            var title = Services.GeoNames.Title(g.Code, L.Language);
+            var level = g.BestMs is not { } ms ? 0 : ms < 300 ? 1 : ms < 800 ? 2 : 3;
+            var quality = g.BestMs is not { } qms ? 0.0 : Math.Clamp(1.0 - (qms - 40.0) / 960.0, 0.14, 1.0);
+            var bestSrv = g.Servers.FirstOrDefault()?.Name ?? "";
+            if (bestSrv.Length > 28) bestSrv = bestSrv[..27] + "…";
+            return new CountryRow
+            {
+                Code = g.Code,
+                Title = title,
+                Count = g.Count,
+                CountText = L.Format("Geo.ServersFmt", g.Count),
+                Best = bestText,
+                BestMs = g.BestMs,
+                PingLevel = level,
+                QualityRatio = quality,
+                IsBestCountry = overallBestCode is not null && string.Equals(g.Code, overallBestCode, StringComparison.OrdinalIgnoreCase),
+                BestServerName = bestSrv,
+                Servers = g.Servers,
+            };
+        }).ToList();
+
         var unknown = _allRows.Count - rows.Sum(r => r.Count);
         if (unknown > 0)
         {
-            var rest = _allRows.Where(r => Koalix.Infrastructure.ServerCountry.FromName(r.Name) is null);
-            rows.Add(new CountryRow { Code = "", Title = L["Geo.Unknown"], Count = unknown, CountText = L.Format("Geo.ServersFmt", unknown), Servers = ByPing(rest) });
+            var rest = ByPing(_allRows.Where(r => Koalix.Infrastructure.ServerCountry.FromName(r.Name) is null));
+            rows.Add(new CountryRow
+            {
+                Code = "",
+                Title = L["Geo.Unknown"],
+                Count = unknown,
+                CountText = L.Format("Geo.ServersFmt", unknown),
+                Servers = rest,
+            });
         }
+
         var open = PickedCountry?.Code;
         CountryRows.Clear();
         foreach (var r in rows) CountryRows.Add(r);
         HasCountryRows = CountryRows.Count > 0 && _allRows.Count > 1;
+
+        var knownCount = rows.Count(r => r.Code.Length == 2);
+        MapSummaryText = L.Format("Map.SummaryFmt", knownCount, _allRows.Count);
+        var bestRow = rows.FirstOrDefault(r => r.IsBestCountry);
+        if (bestRow is not null && bestRow.BestMs is { } bms)
+        {
+            MapBestCountryText = $"★ {bestRow.Title} · {bms:0} ms";
+            HasMapBestCountry = true;
+        }
+        else
+        {
+            MapBestCountryText = "";
+            HasMapBestCountry = false;
+        }
+
+        SyncCountryStates();
+
         // keep an open picker alive across a refresh (e.g. a ping sweep finishing while it is open)
         if (open is not null) { PickedCountry = CountryRows.FirstOrDefault(r => r.Code == open); if (PickedCountry is null) CountryPickerOpen = false; }
+    }
+
+    private void SyncCountryStates()
+    {
+        var activeCode = TunnelGeo?.Code;
+        var selCode = SelectedProfile?.CountryCode;
+        var hovCode = HoveredCountryCode;
+        foreach (var c in CountryRows)
+        {
+            c.IsActiveCountry = c.Code.Length == 2 && string.Equals(c.Code, activeCode, StringComparison.OrdinalIgnoreCase);
+            c.IsSelectedCountry = c.Code.Length == 2 && string.Equals(c.Code, selCode, StringComparison.OrdinalIgnoreCase);
+            c.IsHoveredCountry = c.Code.Length == 2 && string.Equals(c.Code, hovCode, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     private static List<ProfileRow> ByPing(IEnumerable<ProfileRow> rows) =>
         rows.Select(r => (Row: r, Ms: double.TryParse(r.Ping, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : (double?)null))
             .OrderBy(x => x.Ms is null ? 1 : 0).ThenBy(x => x.Ms ?? 0).ThenBy(x => x.Row.Name, StringComparer.CurrentCultureIgnoreCase).Select(x => x.Row).ToList();
+
+    // ─── v0.4.40/v0.4.41 Server Map state & commands ───
+    [ObservableProperty] private string _mapSummaryText = "";
+    [ObservableProperty] private string _mapBestCountryText = "";
+    [ObservableProperty] private bool _hasMapBestCountry;
+    [ObservableProperty] private string _mapRegion = "All";
+    [ObservableProperty] private string? _hoveredCountryCode;
+    [ObservableProperty] private bool _isGlobeMode;
+    public bool IsMapRegionAll => string.Equals(MapRegion, "All", StringComparison.OrdinalIgnoreCase);
+    public bool IsMapRegionEu => string.Equals(MapRegion, "EU", StringComparison.OrdinalIgnoreCase);
+    public bool IsMapRegionAs => string.Equals(MapRegion, "AS", StringComparison.OrdinalIgnoreCase);
+    public bool IsMapRegionAm => string.Equals(MapRegion, "AM", StringComparison.OrdinalIgnoreCase);
+
+    partial void OnMapRegionChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsMapRegionAll));
+        OnPropertyChanged(nameof(IsMapRegionEu));
+        OnPropertyChanged(nameof(IsMapRegionAs));
+        OnPropertyChanged(nameof(IsMapRegionAm));
+    }
+
+    partial void OnHoveredCountryCodeChanged(string? value) => SyncCountryStates();
+
+    [RelayCommand]
+    private void SetMapRegion(string? region) => MapRegion = string.IsNullOrWhiteSpace(region) ? "All" : region;
+
+    [RelayCommand]
+    private void ToggleGlobeMode() => IsGlobeMode = !IsGlobeMode;
 
     /// <summary>v0.4.40 — the country whose servers the picker shows (map pin or flag chip click).</summary>
     [ObservableProperty] private CountryRow? _pickedCountry;
@@ -437,6 +566,23 @@ public sealed partial class DashboardViewModel : PageViewModel
         CountryPickerOpen = false;
         await ConnectToAsync(row.Profile);
     }
+
+    /// <summary>v0.4.41 — quick-connect to the fastest server of a country (from map double-click, flag chip bolt button, or picker header).</summary>
+    [RelayCommand]
+    private async Task ConnectCountryBestAsync(CountryRow? row)
+    {
+        var best = row?.Servers.FirstOrDefault();
+        if (best?.Profile is null) return;
+        CountryPickerOpen = false;
+        await ConnectToAsync(best.Profile);
+    }
+
+    [RelayCommand]
+    private Task ConnectPickedCountryBestAsync() => ConnectCountryBestAsync(PickedCountry);
+
+    /// <summary>v0.4.41 — test ping for only the servers in the currently picked country.</summary>
+    [RelayCommand]
+    private Task PingPickedCountryAsync() => PickedCountry is { Servers.Count: > 0 } c ? RunPingTestsAsync(c.Servers.ToList()) : Task.CompletedTask;
 
     public ObservableCollection<CountryRow> CountryRows { get; } = [];
     [ObservableProperty] private bool _hasCountryRows;
@@ -598,7 +744,7 @@ public sealed partial class DashboardViewModel : PageViewModel
         {
             _trafficCts?.Cancel(); _uptimeTimer.Stop(); Uptime = "00:00:00";
             _spike.Reset(); PingSpiking = false;
-            Upload = Download = "0 B/s"; Latency = "—"; TunnelIp = "—"; EgressVerdict = "Unknown"; EgressVerified = false;
+            Upload = Download = "0 B/s"; OrbActivity = 0; Latency = "—"; TunnelIp = "—"; EgressVerdict = "Unknown"; EgressVerified = false;
             TunnelGeo = null;
             DownHistory.Clear(); UpHistory.Clear(); SessionTraffic = "";
             PersistPerApp(); // final flush of the session's per-app usage (v0.4.15)
@@ -1222,6 +1368,7 @@ public sealed partial class DashboardViewModel : PageViewModel
     private void ApplyTraffic(long upBps, long downBps, long totalUp, long totalDown)
     {
         Upload = Fmt(upBps) + "/s"; Download = Fmt(downBps) + "/s";
+        OrbActivity = downBps <= 0 ? 0 : Math.Clamp(Math.Log10(downBps + 1) / 7.3, 0.08, 1.0);
         ThemeService.ReportTraffic(downBps); // v0.4.38 reactive ARGB + live dashboard background
         SessionTraffic = L.Format("Dash.SessionFmt", Fmt(totalDown), Fmt(totalUp));
         _sessionDown = totalDown; _sessionUp = totalUp;

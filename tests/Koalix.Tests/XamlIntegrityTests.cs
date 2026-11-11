@@ -90,6 +90,25 @@ public class XamlIntegrityTests
                 localKeys.Add(el.GetAttribute("Key", "http://schemas.microsoft.com/winfx/2006/xaml"));
             var resolvable = new HashSet<string>(appKeys.Concat(controlKeys).Concat(windowKeys).Concat(localKeys));
 
+            // 1b. v0.4.41 postmortem guard (koalix-20261111.log): Freezables (TranslateTransform, ScaleTransform,
+            //     Brush, etc.) inside a ControlTemplate/DataTemplate are NOT registered in the template's INameScope
+            //     and throw InvalidOperationException ("'Sheen' name cannot be found in the name scope of
+            //     'System.Windows.Controls.ControlTemplate'") when targeted by Storyboard.TargetName at runtime.
+            var namedTypes = new Dictionary<string, string>();
+            foreach (XmlElement el in doc.SelectNodes("//*[@x:Name]", nsmgr)!)
+                namedTypes[el.GetAttribute("Name", "http://schemas.microsoft.com/winfx/2006/xaml")] = el.LocalName;
+            foreach (XmlElement el in doc.SelectNodes("//*[@*[local-name()='TargetName' or local-name()='Storyboard.TargetName']]", nsmgr)!)
+            {
+                var tn = el.HasAttribute("TargetName") ? el.GetAttribute("TargetName") : el.GetAttribute("Storyboard.TargetName");
+                if (namedTypes.TryGetValue(tn, out var targetType) &&
+                    (targetType.EndsWith("Transform", StringComparison.Ordinal) ||
+                     targetType.EndsWith("Brush", StringComparison.Ordinal) ||
+                     targetType == "GradientStop"))
+                {
+                    errors.Add($"{rel}: TargetName='{tn}' targets Freezable <{targetType}> (throws InvalidOperationException in template NameScope at runtime)");
+                }
+            }
+
             foreach (Match attr in Attribute.Matches(text))
             {
                 var value = attr.Groups[2].Value;

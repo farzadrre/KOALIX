@@ -24,6 +24,18 @@ public partial class DashboardView : System.Windows.Controls.UserControl
         PreviewKeyDown += OnPreviewKeyDown;
     }
 
+    private void OnCountryChipMouseEnter(object sender, MouseEventArgs e)
+    {
+        if (DataContext is DashboardViewModel vm && sender is FrameworkElement { DataContext: CountryRow row } && row.Code.Length == 2)
+            vm.HoveredCountryCode = row.Code;
+    }
+
+    private void OnCountryChipMouseLeave(object sender, MouseEventArgs e)
+    {
+        if (DataContext is DashboardViewModel vm)
+            vm.HoveredCountryCode = null;
+    }
+
     /* ═══════════ WASD server navigation (v0.4.23 — «تو داشبورد کاش کاری کنی که wasd کار کنه و روی سرورا بشه جا به جا شد») ═══════════ */
 
     /// <summary>v0.4.23: کلیدهای W/A/S/D (و کلیدهای جهت‌نما) انتخاب سرور را بین کاشی‌های داشبورد جابه‌جا می‌کنند —

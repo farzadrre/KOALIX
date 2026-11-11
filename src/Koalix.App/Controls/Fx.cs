@@ -1,28 +1,41 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 
 namespace Koalix.App.Controls;
 
 /// <summary>
-/// Visual effects as attached behaviours. <c>Fx.HoverGlow</c> paints a soft accent spotlight that follows the mouse inside a
-/// glass card and lights up the card edge near the cursor. Only the hovered card gets a custom brush; on leave the themed
-/// resources are restored, so theme/accent switching keeps working. Disabled globally via <see cref="Enabled"/>.
+/// Visual effects as attached behaviours. <c>Fx.HoverGlow</c> paints a Windows 11 Fluent Reveal spotlight that follows
+/// the mouse inside a glass card and illuminates the card edge near the cursor. Only the hovered card gets a custom brush;
+/// on leave the exact pre-hover resource/style values are restored, so theme/accent switching and selection triggers keep working.
 /// </summary>
 public static class Fx
 {
     public static bool Enabled { get; set; } = true;
-    private const double Radius = 240;
+    private const double Radius = 250;
 
     public static readonly DependencyProperty HoverGlowProperty =
         DependencyProperty.RegisterAttached("HoverGlow", typeof(bool), typeof(Fx), new PropertyMetadata(false, OnHoverGlowChanged));
     public static bool GetHoverGlow(DependencyObject d) => (bool)d.GetValue(HoverGlowProperty);
     public static void SetHoverGlow(DependencyObject d, bool v) => d.SetValue(HoverGlowProperty, v);
 
-    private sealed class GlowState { public RadialGradientBrush Fill = null!; public RadialGradientBrush Edge = null!; public bool Leaving; }
+    private sealed class GlowState
+    {
+        public RadialGradientBrush Fill = null!;
+        public RadialGradientBrush Edge = null!;
+        public RectangleGeometry RectGeo = null!;
+        public DrawingBrush FillBrush = null!;
+        public DrawingBrush EdgeBrush = null!;
+        public object? OrigBg;
+        public object? OrigBorder;
+        public bool Leaving;
+    }
     private static readonly ConditionalWeakTable<Border, GlowState> States = new();
 
     private static void OnHoverGlowChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -38,36 +51,83 @@ public static class Fx
     {
         if (!Enabled || sender is not Border b || b.ActualWidth < 4 || b.ActualHeight < 4) return;
         var accent = Res("AccentColor", Color.FromRgb(0x7C, 0x5C, 0xFF));
+        var spec = Color.FromArgb(0xFF,
+            (byte)Math.Min(255, accent.R + 78),
+            (byte)Math.Min(255, accent.G + 78),
+            (byte)Math.Min(255, accent.B + 78));
         var p = e.GetPosition(b);
+
+        object? origBg = DependencyProperty.UnsetValue;
+        object? origBorder = DependencyProperty.UnsetValue;
+        if (States.TryGetValue(b, out var prev))
+        {
+            origBg = prev.OrigBg;
+            origBorder = prev.OrigBorder;
+        }
+        else
+        {
+            origBg = b.ReadLocalValue(Border.BackgroundProperty);
+            origBorder = b.ReadLocalValue(Border.BorderBrushProperty);
+        }
+
         var fill = new RadialGradientBrush { MappingMode = BrushMappingMode.Absolute, Center = p, GradientOrigin = p, RadiusX = 0, RadiusY = 0 };
-        fill.GradientStops.Add(new GradientStop(Color.FromArgb(0x38, accent.R, accent.G, accent.B), 0));
-        fill.GradientStops.Add(new GradientStop(Color.FromArgb(0x12, accent.R, accent.G, accent.B), 0.55));
+        fill.GradientStops.Add(new GradientStop(Color.FromArgb(0x34, accent.R, accent.G, accent.B), 0));
+        fill.GradientStops.Add(new GradientStop(Color.FromArgb(0x12, accent.R, accent.G, accent.B), 0.52));
         fill.GradientStops.Add(new GradientStop(Color.FromArgb(0, accent.R, accent.G, accent.B), 1));
+
+        // Windows 11 Fluent Reveal border spotlight: bright specular core fading through the accent into transparent
         var edge = new RadialGradientBrush { MappingMode = BrushMappingMode.Absolute, Center = p, GradientOrigin = p, RadiusX = 0, RadiusY = 0 };
-        edge.GradientStops.Add(new GradientStop(Color.FromArgb(0xE6, accent.R, accent.G, accent.B), 0));
+        edge.GradientStops.Add(new GradientStop(spec, 0));
+        edge.GradientStops.Add(new GradientStop(Color.FromArgb(0xEE, accent.R, accent.G, accent.B), 0.36));
+        edge.GradientStops.Add(new GradientStop(Color.FromArgb(0x44, accent.R, accent.G, accent.B), 0.72));
         edge.GradientStops.Add(new GradientStop(Color.FromArgb(0x00, accent.R, accent.G, accent.B), 1));
 
-        var baseBrush = b.TryFindResource("CardBrush") as Brush ?? Brushes.Transparent;
+        if (States.TryGetValue(b, out _))
+        {
+            RestoreBrushes(b, origBg, origBorder);
+        }
+
+        var baseBrush = b.Background ?? b.TryFindResource("CardBrush") as Brush ?? Brushes.Transparent;
+        var baseEdge = b.BorderBrush ?? b.TryFindResource("CardBorderBrush") as Brush ?? Brushes.Transparent;
         var rect = new RectangleGeometry(new Rect(0, 0, b.ActualWidth, b.ActualHeight));
+
         var group = new DrawingGroup();
         group.Children.Add(new GeometryDrawing(baseBrush, null, rect));
         group.Children.Add(new GeometryDrawing(fill, null, rect));
-        b.Background = new DrawingBrush(group) { Stretch = Stretch.Fill, ViewboxUnits = BrushMappingMode.Absolute, Viewbox = rect.Rect };
+        var fillBrush = new DrawingBrush(group) { Stretch = Stretch.Fill, ViewboxUnits = BrushMappingMode.Absolute, Viewbox = rect.Rect };
+        b.Background = fillBrush;
 
-        var baseEdge = b.TryFindResource("CardBorderBrush") as Brush ?? Brushes.Transparent;
         var edgeGroup = new DrawingGroup();
         edgeGroup.Children.Add(new GeometryDrawing(baseEdge, null, rect));
         edgeGroup.Children.Add(new GeometryDrawing(edge, null, rect));
-        b.BorderBrush = new DrawingBrush(edgeGroup) { Stretch = Stretch.Fill, ViewboxUnits = BrushMappingMode.Absolute, Viewbox = rect.Rect };
+        var edgeBrush = new DrawingBrush(edgeGroup) { Stretch = Stretch.Fill, ViewboxUnits = BrushMappingMode.Absolute, Viewbox = rect.Rect };
+        b.BorderBrush = edgeBrush;
 
-        States.AddOrUpdate(b, new GlowState { Fill = fill, Edge = edge });
-        Animate(fill, Radius, 0.35); Animate(edge, Radius * 0.75, 0.35);
+        States.AddOrUpdate(b, new GlowState
+        {
+            Fill = fill,
+            Edge = edge,
+            RectGeo = rect,
+            FillBrush = fillBrush,
+            EdgeBrush = edgeBrush,
+            OrigBg = origBg,
+            OrigBorder = origBorder,
+        });
+        Animate(fill, Radius, 0.32);
+        Animate(edge, Math.Min(Radius * 0.78, Math.Max(b.ActualWidth, b.ActualHeight) * 0.85), 0.28);
     }
 
     private static void Move(object sender, MouseEventArgs e)
     {
         if (sender is not Border b || !States.TryGetValue(b, out var s) || s.Leaving) return;
         var p = e.GetPosition(b);
+        if (Math.Abs(s.RectGeo.Rect.Width - b.ActualWidth) > 1 || Math.Abs(s.RectGeo.Rect.Height - b.ActualHeight) > 1)
+        {
+            var nr = new Rect(0, 0, Math.Max(1, b.ActualWidth), Math.Max(1, b.ActualHeight));
+            s.RectGeo.Rect = nr;
+            s.FillBrush.Viewbox = nr;
+            s.EdgeBrush.Viewbox = nr;
+        }
         s.Fill.Center = s.Fill.GradientOrigin = p;
         s.Edge.Center = s.Edge.GradientOrigin = p;
     }
@@ -76,15 +136,27 @@ public static class Fx
     {
         if (sender is not Border b || !States.TryGetValue(b, out var s)) return;
         s.Leaving = true;
-        var a = Animate(s.Fill, 0, 0.45);
-        Animate(s.Edge, 0, 0.35);
+        var a = Animate(s.Fill, 0, 0.38);
+        Animate(s.Edge, 0, 0.30);
         a.Completed += (_, _) =>
         {
             if (!States.TryGetValue(b, out var cur) || cur != s) return; // re-entered meanwhile
             States.Remove(b);
-            b.SetResourceReference(Border.BackgroundProperty, "CardBrush");
-            b.SetResourceReference(Border.BorderBrushProperty, "CardBorderBrush");
+            RestoreBrushes(b, s.OrigBg, s.OrigBorder);
         };
+    }
+
+    private static void RestoreBrushes(Border b, object? origBg, object? origBorder)
+    {
+        if (origBg == DependencyProperty.UnsetValue || origBg is null)
+            b.ClearValue(Border.BackgroundProperty);
+        else
+            b.SetValue(Border.BackgroundProperty, origBg);
+
+        if (origBorder == DependencyProperty.UnsetValue || origBorder is null)
+            b.ClearValue(Border.BorderBrushProperty);
+        else
+            b.SetValue(Border.BorderBrushProperty, origBorder);
     }
 
     private static DoubleAnimation Animate(RadialGradientBrush brush, double to, double seconds)
@@ -457,4 +529,145 @@ public static class Fx
     }
 
     private static void Prop(DoubleAnimation a, string path) => Storyboard.SetTargetProperty(a, new PropertyPath(path));
+
+    /* ── v0.4.41: Rolling Odometer Numbers (شمارندهٔ انیمیشنی اعداد داشبورد و سایدبار) ─────────────────────
+       Smoothly interpolates numeric strings ("98 ms" → "42 ms", "1.2 MB/s" → "8.4 MB/s") over 260 ms while
+       gliding the TextBlock vertically with a directional odometer slide and micro-fade. */
+
+    public static readonly DependencyProperty RollValueProperty =
+        DependencyProperty.RegisterAttached("RollValue", typeof(string), typeof(Fx), new PropertyMetadata(null, OnRollValueChanged));
+    public static string? GetRollValue(DependencyObject d) => (string?)d.GetValue(RollValueProperty);
+    public static void SetRollValue(DependencyObject d, string? v) => d.SetValue(RollValueProperty, v);
+
+    private static readonly Regex NumPattern = new(@"^(?<pre>[^\d\-]*)(?<num>-?\d+(?:\.\d+)?)(?<suf>.*)$", RegexOptions.Compiled);
+
+    private sealed class RollState
+    {
+        public string LastRaw = "";
+        public double CurrentNum;
+        public bool HasNum;
+        public string Prefix = "", Suffix = "", Format = "0";
+        public DispatcherTimer? Timer;
+        public DateTime StartAt;
+        public double FromNum, ToNum;
+    }
+
+    private static readonly ConditionalWeakTable<TextBlock, RollState> RollStates = new();
+
+    private static void OnRollValueChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not TextBlock tb) return;
+        var next = e.NewValue as string ?? "";
+        var st = RollStates.GetValue(tb, _ => new RollState());
+        if (string.Equals(st.LastRaw, next, StringComparison.Ordinal)) return;
+
+        var firstLoad = st.LastRaw.Length == 0;
+        st.LastRaw = next;
+
+        if (!Enabled || firstLoad || !tb.IsLoaded)
+        {
+            st.Timer?.Stop();
+            tb.Text = next;
+            if (TryParseMetric(next, out var p0, out var n0, out var fmt0, out var s0))
+            {
+                st.HasNum = true; st.CurrentNum = n0; st.Prefix = p0; st.Suffix = s0; st.Format = fmt0;
+            }
+            else st.HasNum = false;
+            return;
+        }
+
+        if (tb.RenderTransform is not TranslateTransform tr || tr.IsFrozen)
+        {
+            tr = new TranslateTransform();
+            tb.RenderTransform = tr;
+        }
+
+        if (TryParseMetric(next, out var pre, out var num, out var fmt, out var suf)
+            && st.HasNum
+            && string.Equals(st.Prefix, pre, StringComparison.Ordinal)
+            && string.Equals(st.Suffix, suf, StringComparison.Ordinal))
+        {
+            var delta = num - st.CurrentNum;
+            if (Math.Abs(delta) < 0.001)
+            {
+                tb.Text = next;
+                return;
+            }
+
+            // Directional odometer vertical roll (+6px when rising, -6px when dropping)
+            double slideFrom = delta > 0 ? 5.5 : -5.5;
+            var slide = new DoubleAnimation(slideFrom, 0, TimeSpan.FromMilliseconds(240))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            Timeline.SetDesiredFrameRate(slide, 30);
+            tr.BeginAnimation(TranslateTransform.YProperty, slide);
+
+            st.FromNum = st.CurrentNum;
+            st.ToNum = num;
+            st.Prefix = pre;
+            st.Suffix = suf;
+            st.Format = fmt;
+            st.StartAt = DateTime.UtcNow;
+
+            if (st.Timer is null)
+            {
+                st.Timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(28) };
+                st.Timer.Tick += (_, _) =>
+                {
+                    var t = Math.Clamp((DateTime.UtcNow - st.StartAt).TotalMilliseconds / 240.0, 0, 1);
+                    var ease = 1 - Math.Pow(1 - t, 3);
+                    st.CurrentNum = st.FromNum + (st.ToNum - st.FromNum) * ease;
+                    if (t >= 1.0)
+                    {
+                        st.CurrentNum = st.ToNum;
+                        st.Timer.Stop();
+                        tb.Text = st.LastRaw;
+                    }
+                    else
+                    {
+                        tb.Text = st.Prefix + st.CurrentNum.ToString(st.Format, CultureInfo.InvariantCulture) + st.Suffix;
+                    }
+                };
+            }
+            st.Timer.Start();
+        }
+        else
+        {
+            st.Timer?.Stop();
+            if (TryParseMetric(next, out var p1, out var n1, out var fmt1, out var s1))
+            {
+                st.HasNum = true; st.CurrentNum = n1; st.Prefix = p1; st.Suffix = s1; st.Format = fmt1;
+            }
+            else st.HasNum = false;
+
+            tb.Text = next;
+            var slide = new DoubleAnimation(6.0, 0, TimeSpan.FromMilliseconds(220))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            var fade = new DoubleAnimation(0.45, 1.0, TimeSpan.FromMilliseconds(200));
+            Timeline.SetDesiredFrameRate(slide, 30);
+            Timeline.SetDesiredFrameRate(fade, 30);
+            tr.BeginAnimation(TranslateTransform.YProperty, slide);
+            tb.BeginAnimation(UIElement.OpacityProperty, fade);
+        }
+    }
+
+    private static bool TryParseMetric(string s, out string prefix, out double value, out string format, out string suffix)
+    {
+        prefix = ""; value = 0; format = "0"; suffix = "";
+        if (string.IsNullOrWhiteSpace(s) || s.Contains(':') || s.Count(c => c == '.') > 1) return false; // skip IPs and timestamps
+        var m = NumPattern.Match(s);
+        if (!m.Success) return false;
+        var numStr = m.Groups["num"].Value;
+        if (!double.TryParse(numStr, NumberStyles.Float, CultureInfo.InvariantCulture, out value)) return false;
+        prefix = m.Groups["pre"].Value;
+        suffix = m.Groups["suf"].Value;
+        var dot = numStr.IndexOf('.');
+        format = dot >= 0 && numStr.Length - dot - 1 > 0
+            ? "0." + new string('0', numStr.Length - dot - 1)
+            : "0";
+        return true;
+    }
 }
