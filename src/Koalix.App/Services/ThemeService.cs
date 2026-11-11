@@ -30,6 +30,10 @@ public sealed class ThemeService
     /// <remarks>v0.4.32: the argument says whether light/dark is flipping (true) or only the accent colour (false);
     /// the event is not raised at all when nothing visible changes.</remarks>
     public static event Action<bool>? PreviewApply;
+    /// <summary>v0.4.42 — raised after a REAL restyle (light/dark flip, accent or palette pick, style/glass change),
+    /// never on the ARGB rainbow ticks. <see cref="Controls.ThemeRefresh"/> uses it to repaint the hand-drawn
+    /// controls (map, charts, emblems, hover glow) that read colours only when they render.</summary>
+    public static event Action? Restyled;
     public AppTheme Mode { get; private set; } = AppTheme.Dark;
     public Backdrop Backdrop { get; private set; } = Backdrop.Mica;
     public bool BackdropActive { get; private set; }
@@ -49,6 +53,7 @@ public sealed class ThemeService
         WriteStyle();
         foreach (Window w in Application.Current.Windows) if (!w.AllowsTransparency) ApplyBackdrop(w, Backdrop);
         Changed?.Invoke();
+        Restyled?.Invoke();
     }
 
     /* v0.4.38 - STYLE PRESETS + GLASS (user: ready-made themes with different fonts and corners - neon, minimal,
@@ -75,6 +80,7 @@ public sealed class ThemeService
         try { ApplyFont(Localization.Loc.I.Language); } catch { }
         foreach (Window w in Application.Current.Windows) if (!w.AllowsTransparency) ApplyBackdrop(w, Backdrop);
         Changed?.Invoke();
+        Restyled?.Invoke();
     }
 
     /// <summary>Corner radii per style - card / control.</summary>
@@ -203,6 +209,7 @@ public sealed class ThemeService
             _rgb!.Stop(); _rgb = null;
             ApplyAccent(Accent); // back to the chosen colour
             Changed?.Invoke();
+            Restyled?.Invoke();
         }
     }
 

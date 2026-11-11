@@ -37,6 +37,9 @@ public sealed class SectionEmblem : Viewbox
         Unloaded += (_, _) => Stop();
     }
 
+    /// <summary>v0.4.42 — rebuilds the shapes so they pick up the new theme/accent colours.</summary>
+    public void Restyle() => Rebuild();
+
     private void Rebuild()
     {
         Stop();

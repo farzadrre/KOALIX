@@ -27,6 +27,7 @@
         <DataTemplate DataType="{x:Type vm:LogsViewModel}"><v:LogsView/></DataTemplate>
         <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><v:SettingsView/></DataTemplate>
             <DataTemplate DataType="{x:Type vm:AboutViewModel}"><v:AboutView/></DataTemplate>
+        <DataTemplate DataType="{x:Type vm:GuideViewModel}"><v:GuideView/></DataTemplate>
     </Window.Resources>
     <Grid x:Name="Root">
         <!-- Tint over the Mica/Acrylic material + slowly drifting accent "aurora" blobs -->
@@ -107,7 +108,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <StackPanel Grid.Row="2" Orientation="Vertical" Margin="0,8,0,0">
+                            <StackPanel Grid.Row="2" Orientation="Vertical" Margin="0,8,0,0" Visibility="{Binding IsAdvanced, Source={x:Static svc:UiMode.I}, Converter={StaticResource BoolToVis}}">
                                 <!-- v0.4.19 (user: «فقط سینگ باکس و نوشته بقیه و چرا نمینویسه»): one chip per INSTALLED
                                      engine — sing-box, Xray, WireGuard, OpenVPN — not just the sing-box version. -->
                                 <ItemsControl ItemsSource="{Binding EngineChips}" ToolTip="{l:T Settings.Engines}">
@@ -143,6 +144,27 @@
                             </StackPanel>
                         </Grid>
                     </Border>
+
+                    <!-- v0.4.42: in Beginner mode a quiet line under the menu says expert pages are tucked away — one click shows them. -->
+                    <Button x:Name="ShowAdvancedHint" DockPanel.Dock="Bottom" Margin="12,0,12,2" Command="{Binding SetAdvancedModeCommand}" Cursor="Hand"
+                            ToolTip="{l:T Mode.AdvancedTip}" FocusVisualStyle="{x:Null}"
+                            Visibility="{Binding IsSimple, Source={x:Static svc:UiMode.I}, Converter={StaticResource BoolToVis}}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="b" CornerRadius="10" Padding="10,7" Background="Transparent" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE9E9;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{l:T Mode.HiddenHint}" FontSize="11.5" Foreground="{DynamicResource SubtleTextBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="b" Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
 
                     <ListBox x:Name="NavList" ItemsSource="{Binding Nav}" SelectedItem="{Binding Selected}" ItemContainerStyle="{StaticResource NavItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListBox.ItemTemplate>
@@ -209,6 +231,25 @@
                     <Button x:Name="MaxButton" Style="{StaticResource TitleBarButton}" Content="&#xE922;" Click="Maximize_Click"/>
                     <Button Style="{StaticResource CloseButton}" Content="&#xE8BB;" Click="Close_Click"/>
                 </StackPanel>
+                <!-- v0.4.42 — Beginner / Advanced switch, always in sight (user: «بیاریش رو نوار بالای صفحه که تو دید باشه»). -->
+                <c:ModeToggle x:Name="ModeSwitch" DockPanel.Dock="Right" Margin="0,0,10,0"/>
+                <!-- v0.4.42 — "new version" badge: shown on every launch while an update is waiting; click = install / download. -->
+                <Button DockPanel.Dock="Right" Margin="0,0,10,0" VerticalAlignment="Center" Cursor="Hand" Command="{Binding OpenUpdateCommand}"
+                        ToolTip="{l:T Update.BadgeTip}" Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVis}}">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" CornerRadius="10" Padding="10,4" Background="{DynamicResource AccentBrush}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE896;" FontFamily="{StaticResource IconFont}" FontSize="12" Foreground="White" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding UpdateBadgeText}" Margin="6,0,0,0" FontSize="12" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" TextWrapping="NoWrap"/>
+                                </StackPanel>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Opacity" Value="0.85"/></Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
                 <!-- v0.4.6: rounded rectangle (was a full capsule) — sits calmer next to the search field. -->
                 <Border x:Name="StateChip" DockPanel.Dock="Left" CornerRadius="10" Padding="12,4" VerticalAlignment="Center" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                     <StackPanel Orientation="Horizontal">

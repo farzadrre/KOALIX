@@ -1,3 +1,4 @@
+using System.Net.Http;
 using Koalix.Infrastructure;
 using Microsoft.Win32;
 using Velopack;
@@ -20,6 +21,52 @@ public sealed class UpdateService(SettingsRepository settings)
     public string Feed => settings.Get(FeedKey) is { Length: > 0 } f && !string.IsNullOrWhiteSpace(f) ? f : DefaultFeed;
     public bool AutoCheck => settings.Get(AutoKey) != "0";
     public UpdateInfo? Pending => _pending;
+
+    /// <summary>v0.4.42 — newest version seen by the last online check; kept so every launch can announce it (even offline)
+    /// until the user actually updates.</summary>
+    public const string LatestKey = "update.latest";
+
+    /// <summary>The remembered newer version, or null when none / already installed.</summary>
+    public string? KnownLatest => settings.Get(LatestKey) is { Length: > 0 } v && IsNewer(v, CurrentVersion) ? v : null;
+
+    private bool FeedIsGithub => Uri.TryCreate(Feed, UriKind.Absolute, out var u) && u.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Where a portable user downloads the new build.</summary>
+    public string ReleasePage => FeedIsGithub ? Feed.TrimEnd('/') + "/releases/latest" : Feed;
+
+    public static bool IsNewer(string candidate, string current) =>
+        Version.TryParse(candidate.Trim().TrimStart('v', 'V').Split('-', '+')[0], out var a)
+        && Version.TryParse(current.Trim().TrimStart('v', 'V').Split('-', '+')[0], out var b) && a > b;
+
+    /// <summary>
+    /// v0.4.42 — works for BOTH builds: the installed one asks Velopack, the portable one reads the latest GitHub release
+    /// tag. Returns the newer version (and remembers it) or null when up to date. Throws on network errors.
+    /// </summary>
+    public async Task<string?> CheckLatestAsync(HttpClient http, CancellationToken ct = default)
+    {
+        string? latest;
+        if (IsInstalled) latest = await CheckAsync().ConfigureAwait(false);
+        else if (FeedIsGithub)
+        {
+            var path = new Uri(Feed).AbsolutePath.Trim('/');
+            using var req = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{path}/releases/latest");
+            req.Headers.UserAgent.ParseAdd("KOALIX/" + CurrentVersion);
+            req.Headers.Accept.ParseAdd("application/vnd.github+json");
+            using var res = await http.SendAsync(req, ct).ConfigureAwait(false);
+            if (res.StatusCode == System.Net.HttpStatusCode.NotFound) return null; // no release published yet
+            res.EnsureSuccessStatusCode();
+            using var doc = await System.Text.Json.JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync(ct).ConfigureAwait(false), cancellationToken: ct).ConfigureAwait(false);
+            latest = doc.RootElement.TryGetProperty("tag_name", out var t) ? t.GetString()?.Trim().TrimStart('v', 'V') : null;
+        }
+        else return null; // a custom static feed without Velopack install: nothing we can ask
+        if (latest is not null && IsNewer(latest, CurrentVersion))
+        {
+            settings.Set(LatestKey, latest);
+            return latest;
+        }
+        if (!string.IsNullOrEmpty(settings.Get(LatestKey))) settings.Set(LatestKey, "");
+        return null;
+    }
 
     public static string CurrentVersion =>
         typeof(UpdateService).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "0.0.0";

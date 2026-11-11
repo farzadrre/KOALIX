@@ -13,6 +13,7 @@
             <BooleanToVisibilityConverter x:Key="BoolToVis"/>
             <loc:NullToCollapsedConverter x:Key="NullToCollapsed"/>
             <c:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+            <c:AllTrueToVisibilityConverter x:Key="AllTrueToVis"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

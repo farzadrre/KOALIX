@@ -926,6 +926,15 @@ public sealed partial class DashboardViewModel : PageViewModel
         main.Selected = main.Nav.First(n => n.Key == "Nav.Split");
     }
 
+    /// <summary>v0.4.42 — the dashboard's floating «+ افزودن کانفیگ»: jump to Tunnels with the import box already open
+    /// and focused, so a beginner lands exactly where a config link is pasted.</summary>
+    [RelayCommand] private void OpenAddConfig()
+    {
+        AppHost.Get<ProfilesViewModel>().OpenImportOnShow = true;
+        var main = AppHost.Get<MainViewModel>();
+        main.Selected = main.Nav.First(n => n.Key == "Nav.Profiles");
+    }
+
     /// <summary>Server card click (v0.4.3) — the ComboBox became cards, selection is a click. The auto card stores its state (v0.4.6).</summary>
     [RelayCommand] private void SelectProfile(ProfileRow? row)
     {

@@ -217,7 +217,7 @@
     </Border>
 
     <!-- v0.4.38 - the floating mini widget (Afterburner-style overlay) -->
-    <Border Style="{StaticResource Card}">
+    <Border Visibility="{Binding IsAdvanced, Source={x:Static svc:UiMode.I}, Converter={StaticResource BoolToVis}}" Style="{StaticResource Card}">
       <StackPanel>
         <TextBlock Text="{l:T Settings.Widget}" Style="{StaticResource CardTitle}"/>
         <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.WidgetEnabled}" IsChecked="{Binding WidgetEnabled}" HorizontalAlignment="Left" MinWidth="380"/>
@@ -245,12 +245,12 @@
         <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.AutoReconnect}" IsChecked="{Binding AutoReconnect}" HorizontalAlignment="Left" MinWidth="380"/>
         <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.KillSwitch}" IsChecked="{Binding KillSwitch}" HorizontalAlignment="Left" MinWidth="380"/>
         <!-- v0.4.18: close every foreign VPN/filter-breaker client KOALIX detects, right before connecting -->
-        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.KillForeignVpn}" IsChecked="{Binding KillForeignVpn}" HorizontalAlignment="Left" MinWidth="380"/>
-        <TextBlock Text="{l:T Settings.KillForeignVpnHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,4"/>
+        <CheckBox Visibility="{Binding IsAdvanced, Source={x:Static svc:UiMode.I}, Converter={StaticResource BoolToVis}}" Style="{StaticResource Switch}" Content="{l:T Settings.KillForeignVpn}" IsChecked="{Binding KillForeignVpn}" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Visibility="{Binding IsAdvanced, Source={x:Static svc:UiMode.I}, Converter={StaticResource BoolToVis}}" Text="{l:T Settings.KillForeignVpnHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,4"/>
         <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.Hotkey}" IsChecked="{Binding GlobalHotkey}" HorizontalAlignment="Left" MinWidth="380"/>
-        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.RevertOnExit}" IsChecked="{Binding RevertBoostsOnExit}" HorizontalAlignment="Left" MinWidth="380"/>
+        <CheckBox Visibility="{Binding IsAdvanced, Source={x:Static svc:UiMode.I}, Converter={StaticResource BoolToVis}}" Style="{StaticResource Switch}" Content="{l:T Settings.RevertOnExit}" IsChecked="{Binding RevertBoostsOnExit}" HorizontalAlignment="Left" MinWidth="380"/>
         <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.AutoSubs}" IsChecked="{Binding AutoRefreshSubs}" HorizontalAlignment="Left" MinWidth="380"/>
-        <WrapPanel Margin="0,6,0,0">
+        <WrapPanel Visibility="{Binding IsAdvanced, Source={x:Static svc:UiMode.I}, Converter={StaticResource BoolToVis}}" Margin="0,6,0,0">
           <StackPanel Margin="0,0,14,0"><TextBlock Text="{l:T Settings.RemoteDns}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
             <TextBox Text="{Binding RemoteDns, UpdateSourceTrigger=LostFocus}" Width="160" Style="{StaticResource LatinBox}"/></StackPanel>
           <StackPanel><TextBlock Text="{l:T Settings.DirectDns}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
@@ -265,8 +265,8 @@
           <Border DockPanel.Dock="Right" Style="{StaticResource Pill}"><TextBlock Style="{StaticResource Latin}" FontSize="12" FontWeight="SemiBold"><Run Text="v"/><Run Text="{Binding AppVersion, Mode=OneWay}"/></TextBlock></Border>
           <TextBlock Text="{l:T Update.Title}" Style="{StaticResource CardTitle}"/>
         </DockPanel>
-        <TextBlock Text="{l:T Update.FeedLabel}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
-        <TextBox Text="{Binding UpdateFeed, UpdateSourceTrigger=LostFocus}" Tag="{x:Static svc:UpdateService.DefaultFeed}" Style="{StaticResource LatinBox}" MaxWidth="560" HorizontalAlignment="Stretch"/>
+        <TextBlock Visibility="{Binding IsAdvanced, Source={x:Static svc:UiMode.I}, Converter={StaticResource BoolToVis}}" Text="{l:T Update.FeedLabel}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+        <TextBox Visibility="{Binding IsAdvanced, Source={x:Static svc:UiMode.I}, Converter={StaticResource BoolToVis}}" Text="{Binding UpdateFeed, UpdateSourceTrigger=LostFocus}" Tag="{x:Static svc:UpdateService.DefaultFeed}" Style="{StaticResource LatinBox}" MaxWidth="560" HorizontalAlignment="Stretch"/>
         <CheckBox Style="{StaticResource Switch}" Content="{l:T Update.Auto}" IsChecked="{Binding AutoUpdate}" HorizontalAlignment="Left" MinWidth="380"/>
         <WrapPanel>
           <Button Content="{l:T Update.Check}" Command="{Binding CheckUpdatesCommand}" Style="{StaticResource AccentButton}"/>
@@ -280,7 +280,7 @@
 
     <!-- v0.4.15: default mode — the safe baseline KOALIX ships with (WireSock on when installed, strict routing
          off), with a one-click reset after experimenting. -->
-    <Border Style="{StaticResource Card}">
+    <Border Visibility="{Binding IsAdvanced, Source={x:Static svc:UiMode.I}, Converter={StaticResource BoolToVis}}" Style="{StaticResource Card}">
       <StackPanel>
         <TextBlock Text="{l:T Settings.DefaultMode}" Style="{StaticResource CardTitle}"/>
         <TextBlock Text="{l:T Settings.DefaultModeHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,10"/>

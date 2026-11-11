@@ -43,7 +43,8 @@ public sealed partial class MainViewModel : ObservableObject
     public Loc L => Loc.I;
 
     public MainViewModel(DashboardViewModel d, DnsViewModel dns, ProfilesViewModel prof, SplitTunnelViewModel split, InspectorViewModel insp,
-        PingViewModel ping, RepairViewModel rep, GamingViewModel game, ProxyViewModel proxy, LogsViewModel logs, SettingsViewModel set, AboutViewModel about, ConnectionManager cm)
+        PingViewModel ping, RepairViewModel rep, GamingViewModel game, ProxyViewModel proxy, LogsViewModel logs, SettingsViewModel set, AboutViewModel about,
+        GuideViewModel guide, ConnectionManager cm)
     {
         _cm = cm; _dash = d;
         Nav =
@@ -51,11 +52,17 @@ public sealed partial class MainViewModel : ObservableObject
             new("Nav.Dashboard", "\uE80F", d), new("Nav.Dns", "\uE968", dns), new("Nav.Profiles", "\uE705", prof),
             new("Nav.Split", "\uE8AB", split), new("Nav.Inspector", "\uE9D9", insp), new("Nav.Ping", "\uEC05", ping),
             new("Nav.Gaming", "\uE7FC", game), new("Nav.Repair", "\uE90F", rep), new("Nav.Proxy", "\uE774", proxy),
-            new("Nav.Logs", "\uE9F9", logs), new("Nav.Settings", "\uE713", set), new("Nav.About", "\uE946", about),
+            new("Nav.Logs", "\uE9F9", logs), new("Nav.Guide", "\uE897", guide), new("Nav.Settings", "\uE713", set),
+            new("Nav.About", "\uE946", about),
         ];
         _selected = Nav[0];
+        // v0.4.42 - Beginner / Advanced: the sidebar (the ListBox binds the default view) hides the expert pages in Beginner.
+        try { UiMode.I.Load(AppHost.Get<SettingsRepository>()); } catch { }
+        System.Windows.Data.CollectionViewSource.GetDefaultView(Nav).Filter = o => o is NavItem n && UiMode.IsPageVisible(n.Key);
+        UiMode.I.Changed += OnUiModeChanged;
         cm.StateMachine.Changed += c => App.Current.Dispatcher.BeginInvoke(() => { State = c.To; UpdateText(); SoundService.Play(c.To); });
         Loc.I.LanguageChanged += UpdateText;
+        Loc.I.LanguageChanged += () => App.Current.Dispatcher.BeginInvoke(() => OnUpdateVersionChanged(UpdateVersion)); // v0.4.42 badge text
         Loc.I.LanguageChanged += () => App.Current.Dispatcher.BeginInvoke(() => LangSwitchLabel = Loc.I.Language == "fa" ? "EN" : "فا");
         LangSwitchLabel = Loc.I.Language == "fa" ? "EN" : "فا";
         d.PropertyChanged += (_, e) =>
@@ -124,8 +131,67 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>VERSION files carry full GitHub tags ("v1.14.4"); the chips only need the number.</summary>
     private static string VersionShort(string tag) => tag.Trim().TrimStart('v', 'V');
 
+    /// <summary>v0.4.42: the mode flipped — leave a page that just got hidden, re-filter the sidebar and the palette.</summary>
+    private void OnUiModeChanged()
+    {
+        if (!UiMode.IsPageVisible(Selected?.Key ?? "")) Selected = Nav[0];
+        System.Windows.Data.CollectionViewSource.GetDefaultView(Nav).Refresh();
+        BuildPalette();
+        Services.Toasts.Show(Loc.I[UiMode.I.IsSimple ? "Mode.SimpleOn" : "Mode.AdvancedOn"],
+            Loc.I[UiMode.I.IsSimple ? "Mode.SimpleOnText" : "Mode.AdvancedOnText"], Services.ToastKind.Info);
+    }
+
+    [RelayCommand] private void SetAdvancedMode() => UiMode.I.IsSimple = false;
+
+    // v0.4.42 — update notice (user: «وقتی اپدیت میاد برای طرف بنویسه که اپدیت جدید اومده و هر بار وارد اپ میشه بهش بگه
+    // و بعد تو بخش اعلان‌ها بره»). Every launch: a toast (which also lands in the notification center) + a title-bar badge.
+    [ObservableProperty] private string _updateVersion = "";
+    [ObservableProperty] private string _updateBadgeText = "";
+    public bool HasUpdate => UpdateVersion.Length > 0;
+    partial void OnUpdateVersionChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasUpdate));
+        UpdateBadgeText = value.Length > 0 ? Loc.I.Format("Update.Badge", value) : "";
+    }
+
+    /// <summary>Shows the "new version" toast + badge. Safe to call from any thread.</summary>
+    public void AnnounceUpdate(string version)
+    {
+        App.Current.Dispatcher.BeginInvoke(() =>
+        {
+            UpdateVersion = version;
+            var u = AppHost.Get<UpdateService>();
+            Services.Toasts.Show(Loc.I.Format("Update.NewTitle", version),
+                Loc.I.Format(u.IsInstalled ? "Update.NewBodyInstalled" : "Update.NewBodyPortable", version, UpdateService.CurrentVersion),
+                Services.ToastKind.Info);
+        });
+    }
+
+    public void ClearUpdate() => App.Current.Dispatcher.BeginInvoke(() => UpdateVersion = "");
+
+    /// <summary>Badge click: the installed build goes to Settings › Updates (download + install there); the portable build
+    /// opens the GitHub release page to download the new exe.</summary>
+    [RelayCommand]
+    private void OpenUpdate()
+    {
+        var u = AppHost.Get<UpdateService>();
+        if (u.IsInstalled)
+        {
+            if (Nav.FirstOrDefault(n => n.Key == "Nav.Settings") is { } s) Selected = s;
+            return;
+        }
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(u.ReleasePage) { UseShellExecute = true }); }
+        catch (Exception ex) { StartupLog.Trace("open release page: " + ex.Message); }
+    }
+
     partial void OnSelectedChanged(NavItem? oldValue, NavItem newValue)
     {
+        // v0.4.42: the sidebar ListBox pushes null back when asked to select a page Beginner mode hides — land on the dashboard.
+        if (newValue is null)
+        {
+            App.Current.Dispatcher.BeginInvoke(() => { if (Selected is null) Selected = Nav[0]; });
+            return;
+        }
         oldValue?.Page.OnDeactivated();
         // v0.4.27 — a page that fails to activate now shows a LOCALIZED toast (the old one put the raw
         // "NullReferenceException" type name in the title — English tech-speak for a Persian UI).
@@ -159,7 +225,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         List<PaletteItem> all =
         [
-            .. Nav.Select(n => new PaletteItem(Loc.I[n.Key], Loc.I["Palette.Pages"], n.Glyph, () => Selected = n)),
+            .. Nav.Where(n => UiMode.IsPageVisible(n.Key)).Select(n => new PaletteItem(Loc.I[n.Key], Loc.I["Palette.Pages"], n.Glyph, () => Selected = n)),
             // The virtual auto row is not a connectable profile — it has its own command below (v0.4.6).
             .. _dash.Profiles.Where(r => !r.IsAuto).Select(r => new PaletteItem(r.Name, Loc.I["Palette.Profiles"] + " · " + r.Engine, "\uE705",
                 () => { Selected = Nav[0]; _ = _dash.ConnectToAsync(r.Profile!); })),

@@ -65,6 +65,7 @@ public partial class App : Application
             Controls.Fx.Enabled = !safe && settings.Get("ui.effects") != "0";
             Controls.LiveBackdrop.Allowed = settings.Get(Controls.LiveBackdrop.SettingKey) != "0";
             SoundService.Load(settings); // v0.4.23: the connect/disconnect/error tones honour "ui.sounds"
+            Controls.ThemeRefresh.Install(); // v0.4.42: hand-drawn controls repaint on every theme/palette change
             var theme = AppHost.Get<ThemeService>();
             try { theme.Apply(Enum.TryParse<AppTheme>(settings.Get("ui.theme"), out var t) ? t : AppTheme.Dark, safe ? null : settings.Get("ui.accent")); }
             catch (Exception ex) { StartupLog.Trace("theme: " + ex); theme.Apply(AppTheme.Dark, ThemeService.DefaultAccent); }
@@ -164,13 +165,22 @@ public partial class App : Application
 
     private static async Task CheckUpdatesInBackgroundAsync()
     {
+        // v0.4.42 — announced on EVERY launch until the user updates (toast → also in the notification center, + title-bar
+        // badge). The remembered version shows right away (works offline); the online check then confirms or refreshes it.
+        // Now covers the portable build too (latest GitHub release), not only the installed one.
         var u = AppHost.Get<UpdateService>();
-        if (!u.AutoCheck || string.IsNullOrWhiteSpace(u.Feed) || !u.IsInstalled) return;
+        if (!u.AutoCheck || string.IsNullOrWhiteSpace(u.Feed)) return;
+        var main = AppHost.Get<ViewModels.MainViewModel>();
+        string? announced = null;
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(8));
-            if (await u.CheckAsync() is { } v)
-                Toasts.Show(Loc.I["Update.AvailableTitle"], Loc.I.Format("Update.Available", v), ToastKind.Info);
+            await Task.Delay(TimeSpan.FromSeconds(4));
+            announced = u.KnownLatest;
+            if (announced is not null) main.AnnounceUpdate(announced);
+            await Task.Delay(TimeSpan.FromSeconds(4));
+            var v = await u.CheckLatestAsync(AppHost.Get<System.Net.Http.HttpClient>());
+            if (v is null) { if (announced is not null) main.ClearUpdate(); }
+            else if (v != announced) main.AnnounceUpdate(v);
         }
         catch (Exception ex) { AppHost.Log(LogCategory.Application, "auto update check: " + ex.Message); }
     }

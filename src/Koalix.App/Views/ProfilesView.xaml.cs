@@ -20,6 +20,11 @@ public partial class ProfilesView : UserControl
     public ProfilesView()
     {
         InitializeComponent();
+        // v0.4.42: Beginner mode drops the raw-config preview column so the list gets the whole width.
+        ApplyMode();
+        void OnMode() => Dispatcher.BeginInvoke(ApplyMode);
+        Loaded += (_, _) => { Services.UiMode.I.Changed -= OnMode; Services.UiMode.I.Changed += OnMode; };
+        Unloaded += (_, _) => Services.UiMode.I.Changed -= OnMode;
         // v0.4.12: the import card, the subscriptions section and the list slide in one after another —
         // same motion language as the dashboard.
         Loaded += (_, _) =>
@@ -27,8 +32,19 @@ public partial class ProfilesView : UserControl
             if (_entered) return;
             _entered = true;
             if (FindName("Cards") is Panel p) Controls.Fx.Stagger(p, 0.05);
+            // v0.4.42: arrived from the dashboard's «+ افزودن کانفیگ» — open the import box and put the caret in it.
+            if (DataContext is ProfilesViewModel { OpenImportOnShow: true } vm)
+            {
+                vm.OpenImportOnShow = false;
+                if (!_importOpen) ImportHeader_Click(this, new RoutedEventArgs());
+                Dispatcher.BeginInvoke(() => { ImportBox.Focus(); Keyboard.Focus(ImportBox); },
+                    System.Windows.Threading.DispatcherPriority.Input);
+            }
         };
     }
+
+    private void ApplyMode() =>
+        PreviewCol.Width = Services.UiMode.I.IsSimple ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
 
     /// <summary>v0.4.19: expand/collapse the import box (collapsed by default so the list gets the space).</summary>
     private void ImportHeader_Click(object sender, RoutedEventArgs e)

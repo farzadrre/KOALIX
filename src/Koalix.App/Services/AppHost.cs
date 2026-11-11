@@ -116,6 +116,7 @@ public static class AppHost
         s.AddSingleton<ViewModels.LogsViewModel>();
         s.AddSingleton<ViewModels.SettingsViewModel>();
         s.AddSingleton<ViewModels.AboutViewModel>(); // v0.4.38
+        s.AddSingleton<ViewModels.GuideViewModel>(); // v0.4.42 — the آموزش page
         Services = s.BuildServiceProvider();
         // v0.4.30 — one-time migration: flip strict_route ON for every existing installation. The v0.4.15
         // default (OFF, out of WFP-clash caution) shipped for five versions and is what opened the DNS-leak

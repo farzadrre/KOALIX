@@ -4,7 +4,7 @@ title KOALIX Build
 cd /d "%~dp0"
 
 echo ==================================================
-echo    KOALIX v0.4.41  --  BUILD
+echo    KOALIX v0.4.42  --  BUILD
 echo ==================================================
 echo.
 

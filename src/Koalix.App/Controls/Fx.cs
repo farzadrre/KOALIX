@@ -146,6 +146,19 @@ public static class Fx
         };
     }
 
+    /// <summary>v0.4.42 — drops a live hover-glow: its composed brush holds a SNAPSHOT of the card colour, so after a
+    /// theme/palette change the card would keep the old colour until the mouse left it. Restores the themed brushes.</summary>
+    internal static void ResetGlow(Border b)
+    {
+        if (!States.TryGetValue(b, out var s)) return;
+        States.Remove(b);
+        s.Fill.BeginAnimation(RadialGradientBrush.RadiusXProperty, null);
+        s.Fill.BeginAnimation(RadialGradientBrush.RadiusYProperty, null);
+        s.Edge.BeginAnimation(RadialGradientBrush.RadiusXProperty, null);
+        s.Edge.BeginAnimation(RadialGradientBrush.RadiusYProperty, null);
+        RestoreBrushes(b, s.OrigBg, s.OrigBorder);
+    }
+
     private static void RestoreBrushes(Border b, object? origBg, object? origBorder)
     {
         if (origBg == DependencyProperty.UnsetValue || origBg is null)

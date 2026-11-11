@@ -49,3 +49,13 @@ public sealed class PercentToWidth : IValueConverter
     }
     public object ConvertBack(object value, Type t, object p, CultureInfo c) => throw new NotSupportedException();
 }
+
+/// <summary>v0.4.42: Visible only when EVERY bound value is <c>true</c> — e.g. «has data» AND «Advanced mode».</summary>
+public sealed class AllTrueToVisibilityConverter : System.Windows.Data.IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, System.Globalization.CultureInfo culture) =>
+        values.All(v => v is true) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, System.Globalization.CultureInfo culture) =>
+        throw new NotSupportedException();
+}

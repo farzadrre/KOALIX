@@ -157,6 +157,9 @@ public sealed partial class ProfilesViewModel : PageViewModel
     /// <summary>True when every visible row is ticked — drives the select-all toggle text.</summary>
     public bool AllSelected => SelectedCount > 0 && Rows.Count > 0 && Rows.All(r => r.IsChecked);
     public bool HasSelection => SelectedCount > 0;
+    /// <summary>v0.4.42: set by the dashboard's «+ افزودن کانفیگ» right before navigating here — the view opens the
+    /// import box and focuses it once, then clears the flag.</summary>
+    public bool OpenImportOnShow { get; set; }
 
     public ProfilesViewModel(TunnelProfileRepository repo, SubscriptionRepository subs, SettingsRepository settings, EnginePaths paths, ConnectionManager cm)
     {
