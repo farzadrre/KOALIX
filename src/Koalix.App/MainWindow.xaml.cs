@@ -18,7 +18,6 @@ namespace Koalix.App;
 
 public partial class MainWindow : Window
 {
-    private readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromSeconds(4.5) };
     private Storyboard? _aurora;
     // v0.4.23 — theme cross-fade state (the old look snapshot fades out over the new one) + focus overlay.
     private AppTheme _themeMode = AppTheme.Dark;
@@ -40,6 +39,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        InitMotion(); // v0.4.43: page hosts, menu rail, toast stack, bell (MainWindow.Motion.cs)
         try { Icon = System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/KOALIX;component/Assets/koalix.png")); }
         catch (Exception ex) { StartupLog.Trace("window icon: " + ex.Message); }
         SourceInitialized += (_, _) =>
@@ -56,7 +56,7 @@ public partial class MainWindow : Window
         Loaded += (_, _) =>
         {
             StartupLog.Trace("main window loaded");
-            try { StartAurora(); Fx.SlideIn(PageHost); } catch (Exception ex) { StartupLog.Trace("aurora: " + ex); Aurora.Visibility = Visibility.Collapsed; }
+            try { StartAurora(); Fx.SlideIn(_pageFront); } catch (Exception ex) { StartupLog.Trace("aurora: " + ex); Aurora.Visibility = Visibility.Collapsed; }
         };
         // v0.4.22 — the first-run starter tour: opens itself exactly once (ui.onboarded), unless we're in safe mode.
         Loaded += (_, _) =>
@@ -79,14 +79,14 @@ public partial class MainWindow : Window
             vm.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(MainViewModel.State)) { UpdateState(vm.State); MaybeConnectHalo(vm.State); }
-                if (e.PropertyName == nameof(MainViewModel.Selected)) Fx.SlideIn(PageHost);
+                if (e.PropertyName == nameof(MainViewModel.Selected)) ShowPage(vm, animate: true);
             };
+            ShowPage(vm, animate: false);
             try { vm.Selected.Page.OnActivated(); } catch (Exception ex) { StartupLog.Trace("page activation: " + ex); }
             UpdateState(vm.State);
         };
         Toasts.Raised += ShowToast;
         Toasts.HistoryChanged += UpdateNotifBadge;
-        _toastTimer.Tick += (_, _) => HideToast();
         ThemeService.Changed += () => { if (DataContext is MainViewModel vm) UpdateState(vm.State); OnThemeSwapped(); };
         ThemeService.PreviewApply += OnThemePreviewApply;
         _themeMode = AppHost.Get<ThemeService>().Mode;
@@ -306,7 +306,7 @@ public partial class MainWindow : Window
             var W = Root.ActualWidth; var H = Root.ActualHeight;
             if (W < 60 || H < 60) return;
             // origin: the connect orb when the dashboard is showing, else the status chip, else the window centre
-            FrameworkElement? anchor = FindVisual<ConnectOrb>(PageHost) is { IsVisible: true, ActualWidth: > 0 } orb ? orb
+            FrameworkElement? anchor = FindVisual<ConnectOrb>(_pageFront) is { IsVisible: true, ActualWidth: > 0 } orb ? orb
                                      : StateChip.IsVisible ? StateChip : null;
             var o = anchor is null ? new Point(W / 2, H / 2)
                                    : anchor.TransformToVisual(Root).Transform(new Point(anchor.ActualWidth / 2, anchor.ActualHeight / 2));
@@ -593,37 +593,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ShowToast(ToastMessage m)
-    {
-        if (!IsVisible || WindowState == WindowState.Minimized)
-        {
-            AppHost.Get<TrayService>().Notify(m.Title, m.Text ?? "", m.Kind);
-            return;
-        }
-        ToastTitle.Text = m.Title;
-        ToastText.Text = m.Text ?? "";
-        ToastText.Visibility = string.IsNullOrEmpty(m.Text) ? Visibility.Collapsed : Visibility.Visible;
-        ToastIcon.Text = m.Glyph;
-        ToastIconBg.SetResourceReference(Border.BackgroundProperty, m.Kind switch
-        {
-            ToastKind.Success => "SuccessBrush", ToastKind.Warning => "WarningBrush", ToastKind.Error => "DangerBrush", _ => "AccentGradientBrush",
-        });
-        Toast.Visibility = Visibility.Visible;
-        Fx.SlideIn(Toast, 24, 0.35);
-        _toastTimer.Stop();
-        _toastTimer.Interval = TimeSpan.FromSeconds(m.Kind == ToastKind.Error ? 8 : 4.5);
-        _toastTimer.Start();
-    }
-
-    private void HideToast()
-    {
-        _toastTimer.Stop();
-        var a = new DoubleAnimation(0, TimeSpan.FromSeconds(0.25));
-        a.Completed += (_, _) => { if (!_toastTimer.IsEnabled) Toast.Visibility = Visibility.Collapsed; };
-        Toast.BeginAnimation(OpacityProperty, a);
-    }
-
-    private void Toast_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => HideToast();
+    // v0.4.43: ShowToast (the toast stack) and UpdateNotifBadge (the bell) moved to MainWindow.Motion.cs.
 
     private void StatusCard_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
@@ -764,8 +734,6 @@ public partial class MainWindow : Window
         NotifPopup.IsOpen = false;
         if (DataContext is MainViewModel vm) vm.ExportDiagnostics();
     }
-
-    private void UpdateNotifBadge() => NotifBadge.Visibility = Toasts.Unread > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
     private void Maximize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;

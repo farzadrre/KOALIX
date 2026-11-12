@@ -376,11 +376,10 @@ public static class Fx
         "Nav.Proxy" => Spin(-4.6),              // second globe — counter-spin
         "Nav.Settings" => Spin(6.5),            // gear — turning
         "Nav.Dashboard" => Pulse(1.16, 1.25),   // home — heartbeat
-        "Nav.Gaming" => Pulse(1.12, 0.8),       // gamepad — hop
         "Nav.Profiles" => Bob(-3.2, 1.0),       // servers — stack bob
         "Nav.Logs" => Shuffle(1.8, 1.35),       // list — nudge
         "Nav.Repair" => Rock(20, 1.35),         // wrench — rock
-        "Nav.Split" or "Nav.Inspector" or "Nav.Ping" or "Nav.About" => null, // live vector icons now (MotionGlyph, v0.4.19)
+        "Nav.Split" or "Nav.Inspector" or "Nav.Ping" or "Nav.About" or "Nav.Gaming" => null, // live vector icons now (MotionGlyph, v0.4.19; Gaming joined in v0.4.46)
         _ => Pulse(1.1, 1.6),
     };
 

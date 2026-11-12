@@ -375,12 +375,8 @@
             <!-- v0.4.19 drag-and-drop insertion cue: the accent line that follows the cursor between rows. -->
             <Border x:Name="DropLine" Height="3" CornerRadius="1.5" Background="{DynamicResource AccentBrush}" Opacity="0.9"
                     Visibility="Collapsed" VerticalAlignment="Top" IsHitTestVisible="False" Margin="6,-1,16,0"/>
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
-              <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers>
-                <DataTrigger Binding="{Binding Rows.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
-              <TextBlock Text="&#xE774;" Style="{StaticResource Icon}" FontSize="34" HorizontalAlignment="Center" Foreground="{DynamicResource SubtleTextBrush}" Opacity="0.6"/>
-              <TextBlock Text="{l:T Profiles.Empty}" Style="{StaticResource Subtle}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-            </StackPanel>
+            <!-- v0.4.43: animated empty state (Controls/EmptyState) -->
+            <c:EmptyState Glyph="&#xE774;" Text="{l:T Profiles.Empty}" Count="{Binding Rows.Count}"/>
           </Grid>
         </DockPanel>
       </Border>

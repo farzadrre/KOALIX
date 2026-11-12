@@ -1,5 +1,5 @@
 <UserControl x:Class="Koalix.App.Views.InspectorView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="clr-namespace:Koalix.App.Localization" xmlns:c="clr-namespace:Koalix.App.Controls">
-  <DockPanel>
+  <DockPanel c:Motion.Entrance="True">
     <StackPanel DockPanel.Dock="Top">
       <TextBlock Text="{l:T Inspector.Title}" Style="{StaticResource Title}"/>
       <TextBlock Text="{l:T Inspector.Subtitle}" Style="{StaticResource Subtitle}"/>
@@ -16,41 +16,50 @@
     </StackPanel>
     <TabControl Background="Transparent" BorderThickness="0">
       <TabItem Header="{l:T Inspector.Apps}">
-        <DataGrid ItemsSource="{Binding Apps}">
-          <DataGrid.Columns>
-            <DataGridTextColumn Header="{l:T Split.Path}" Binding="{Binding ProcessPath}" Width="2*"/>
-            <DataGridTemplateColumn Header="{l:T Inspector.Configured}" Width="100"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Split.Route"><Binding Path="ConfiguredRoute"/><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
-            <DataGridTemplateColumn Header="{l:T Inspector.Observed}" Width="110"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Route"><Binding Path="ObservedRoute"/><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
-            <DataGridTextColumn Header="{l:T Inspector.Conns}" Binding="{Binding Connections}" Width="70"/>
-            <DataGridTextColumn Header="{l:T Dash.Upload}" Binding="{Binding Upload}" Width="100"/>
-            <DataGridTextColumn Header="{l:T Dash.Download}" Binding="{Binding Download}" Width="100"/>
-          </DataGrid.Columns>
-        </DataGrid>
+        <Grid>
+          <DataGrid x:Name="AppsGrid" ItemsSource="{Binding Apps}">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="{l:T Split.Path}" Binding="{Binding ProcessPath}" Width="2*"/>
+              <DataGridTemplateColumn Header="{l:T Inspector.Configured}" Width="100"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Split.Route"><Binding Path="ConfiguredRoute"/><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+              <DataGridTemplateColumn Header="{l:T Inspector.Observed}" Width="110"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Route"><Binding Path="ObservedRoute"/><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+              <DataGridTextColumn Header="{l:T Inspector.Conns}" Binding="{Binding Connections}" Width="70"/>
+              <DataGridTextColumn Header="{l:T Dash.Upload}" Binding="{Binding Upload}" Width="100"/>
+              <DataGridTextColumn Header="{l:T Dash.Download}" Binding="{Binding Download}" Width="100"/>
+            </DataGrid.Columns>
+          </DataGrid>
+          <c:EmptyState Glyph="&#xE71D;" Text="{l:T Inspector.Empty}" Count="{Binding Items.Count, ElementName=AppsGrid}" Margin="0,36,0,0"/>
+        </Grid>
       </TabItem>
       <TabItem Header="{l:T Inspector.Connections}">
-        <DataGrid ItemsSource="{Binding Connections}">
-          <DataGrid.Columns>
-            <DataGridTextColumn Header="{l:T Split.App}" Binding="{Binding ProcessName}" Width="*"/>
-            <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="60"/>
-            <DataGridTextColumn Header="{l:T Inspector.Proto}" Binding="{Binding Protocol}" Width="55"/>
-            <DataGridTextColumn Header="{l:T Inspector.Remote}" Binding="{Binding Remote}" Width="1.2*"/>
-            <DataGridTextColumn Header="{l:T Inspector.Host}" Binding="{Binding Host}" Width="1.2*"/>
-            <DataGridTemplateColumn Header="{l:T Inspector.Observed}" Width="100"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Route"><Binding Path="Route"/><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
-            <DataGridTextColumn Header="{l:T Inspector.Outbound}" Binding="{Binding Outbound}" Width="80"/>
-            <DataGridTextColumn Header="{l:T Inspector.Rule}" Binding="{Binding MatchedRule}" Width="1.2*"/>
-          </DataGrid.Columns>
-        </DataGrid>
+        <Grid>
+          <DataGrid x:Name="ConnGrid" ItemsSource="{Binding Connections}">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="{l:T Split.App}" Binding="{Binding ProcessName}" Width="*"/>
+              <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="60"/>
+              <DataGridTextColumn Header="{l:T Inspector.Proto}" Binding="{Binding Protocol}" Width="55"/>
+              <DataGridTextColumn Header="{l:T Inspector.Remote}" Binding="{Binding Remote}" Width="1.2*"/>
+              <DataGridTextColumn Header="{l:T Inspector.Host}" Binding="{Binding Host}" Width="1.2*"/>
+              <DataGridTemplateColumn Header="{l:T Inspector.Observed}" Width="100"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Route"><Binding Path="Route"/><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+              <DataGridTextColumn Header="{l:T Inspector.Outbound}" Binding="{Binding Outbound}" Width="80"/>
+              <DataGridTextColumn Header="{l:T Inspector.Rule}" Binding="{Binding MatchedRule}" Width="1.2*"/>
+            </DataGrid.Columns>
+          </DataGrid>
+          <c:EmptyState Glyph="&#xE839;" Text="{l:T Inspector.Empty}" Count="{Binding Items.Count, ElementName=ConnGrid}" Margin="0,36,0,0"/>
+        </Grid>
       </TabItem>
       <TabItem Header="{l:T Inspector.Dns}">
-        <DataGrid ItemsSource="{Binding DnsLookups}">
-          <DataGrid.Columns>
-            <DataGridTextColumn Header="{l:T Inspector.Time}" Binding="{Binding At, StringFormat=HH:mm:ss}" Width="80"/>
-            <DataGridTextColumn Header="{l:T Inspector.Domain}" Binding="{Binding Domain}" Width="2*"/>
-            <DataGridTextColumn Header="{l:T Inspector.Type}" Binding="{Binding QueryType}" Width="60"/>
-            <DataGridTextColumn Header="{l:T Inspector.Server}" Binding="{Binding Server}" Width="*"/>
-            <DataGridTextColumn Header="{l:T Inspector.Answer}" Binding="{Binding Answer}" Width="*"/>
-          </DataGrid.Columns>
-        </DataGrid>
+        <Grid>
+          <DataGrid x:Name="DnsGrid" ItemsSource="{Binding DnsLookups}">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="{l:T Inspector.Time}" Binding="{Binding At, StringFormat=HH:mm:ss}" Width="80"/>
+              <DataGridTextColumn Header="{l:T Inspector.Domain}" Binding="{Binding Domain}" Width="2*"/>
+              <DataGridTextColumn Header="{l:T Inspector.Type}" Binding="{Binding QueryType}" Width="60"/>
+              <DataGridTextColumn Header="{l:T Inspector.Server}" Binding="{Binding Server}" Width="*"/>
+              <DataGridTextColumn Header="{l:T Inspector.Answer}" Binding="{Binding Answer}" Width="*"/>
+            </DataGrid.Columns>
+          </DataGrid>
+          <c:EmptyState Glyph="&#xE774;" Text="{l:T Inspector.Empty}" Count="{Binding Items.Count, ElementName=DnsGrid}" Margin="0,36,0,0"/>
+        </Grid>
       </TabItem>
     </TabControl>
   </DockPanel>

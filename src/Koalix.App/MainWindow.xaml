@@ -166,6 +166,9 @@
                         </Button.Template>
                     </Button>
 
+                    <!-- v0.4.43: ONE accent rail for the whole menu (NavRail, drawn over the list) glides from the old
+                         section to the new one — the per-item pills that popped in and out are gone. -->
+                    <Grid x:Name="NavHost" ClipToBounds="True">
                     <ListBox x:Name="NavList" ItemsSource="{Binding Nav}" SelectedItem="{Binding Selected}" ItemContainerStyle="{StaticResource NavItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
@@ -214,10 +217,25 @@
                                         <Setter TargetName="GlyphText" Property="Visibility" Value="Collapsed"/>
                                         <Setter TargetName="LiveGlyph" Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
+                                    <!-- v0.4.46: the gamepad is a drawn, played icon too (was the font glyph with a scale "hop") -->
+                                    <DataTrigger Binding="{Binding Key}" Value="Nav.Gaming">
+                                        <Setter TargetName="GlyphText" Property="Visibility" Value="Collapsed"/>
+                                        <Setter TargetName="LiveGlyph" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+                    <Border x:Name="NavRail" Width="4" Height="18" CornerRadius="2" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False"
+                            Background="{DynamicResource AccentGradientBrush}" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform x:Name="NavRailStretch"/>
+                                <TranslateTransform x:Name="NavRailMove"/>
+                            </TransformGroup>
+                        </Border.RenderTransform>
+                    </Border>
+                    </Grid>
                 </DockPanel>
             </Border>
 
@@ -302,13 +320,19 @@
                 </Grid>
             </DockPanel>
 
-            <!-- Page host (fade/slide transition on navigation) -->
-            <ContentControl x:Name="PageHost" Grid.Row="1" Grid.Column="1" Content="{Binding Selected.Page}" Margin="26,6,12,12" Focusable="False">
-                <ContentControl.RenderTransform><TranslateTransform/></ContentControl.RenderTransform>
-            </ContentControl>
+            <!-- Page host. v0.4.43: TWO hosts that swap roles (code-behind ShowPage) — the page being left fades out
+                 while the new one comes in from the side it sits on in the menu (below → rises, above → drops). -->
+            <Grid Grid.Row="1" Grid.Column="1" Margin="26,6,12,12">
+                <ContentControl x:Name="PageHostB" Focusable="False" IsHitTestVisible="False">
+                    <ContentControl.RenderTransform><TranslateTransform/></ContentControl.RenderTransform>
+                </ContentControl>
+                <ContentControl x:Name="PageHost" Focusable="False">
+                    <ContentControl.RenderTransform><TranslateTransform/></ContentControl.RenderTransform>
+                </ContentControl>
+            </Grid>
 
             <!-- Command palette (v0.4.3, Ctrl+K) -->
-            <Popup x:Name="PalettePopup" AllowsTransparency="True" StaysOpen="False" PlacementTarget="{Binding ElementName=Root}" Placement="Center" VerticalOffset="-120" PopupAnimation="Fade" Focusable="False">
+            <Popup x:Name="PalettePopup" AllowsTransparency="True" StaysOpen="False" PlacementTarget="{Binding ElementName=Root}" Placement="Center" VerticalOffset="-120" PopupAnimation="Fade" Focusable="False" c:Motion.PopIn="True">
                 <Border Width="620" MaxHeight="500" CornerRadius="16" Background="{DynamicResource PopupBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1">
                     <Border.Effect><DropShadowEffect BlurRadius="36" ShadowDepth="8" Opacity="0.45" Color="{DynamicResource ShadowColor}"/></Border.Effect>
                     <StackPanel>
@@ -346,20 +370,13 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
-                        <TextBlock Text="{l:T Palette.Empty}" FontSize="12" HorizontalAlignment="Center" Margin="0,0,0,16">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource Subtle}">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers><DataTrigger Binding="{Binding Items.Count, ElementName=PaletteList}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                        <c:EmptyState Glyph="&#xE721;" Text="{l:T Palette.Empty}" Count="{Binding Items.Count, ElementName=PaletteList}" Margin="0,4,0,18"/>
                     </StackPanel>
                 </Border>
             </Popup>
 
             <!-- Notification center (v0.4.3) -->
-            <Popup x:Name="NotifPopup" AllowsTransparency="True" StaysOpen="False" PlacementTarget="{Binding ElementName=BellWrap}" Placement="Bottom" VerticalOffset="6" PopupAnimation="Fade" Focusable="False">
+            <Popup x:Name="NotifPopup" AllowsTransparency="True" StaysOpen="False" PlacementTarget="{Binding ElementName=BellWrap}" Placement="Bottom" VerticalOffset="6" PopupAnimation="Fade" Focusable="False" c:Motion.PopIn="True">
                 <Border Width="400" MaxHeight="460" CornerRadius="16" Background="{DynamicResource PopupBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1">
                     <Border.Effect><DropShadowEffect BlurRadius="30" ShadowDepth="7" Opacity="0.4" Color="{DynamicResource ShadowColor}"/></Border.Effect>
                     <Grid Margin="8,8,8,10">
@@ -395,8 +412,12 @@
                                             <TextBlock Text="{Binding Message.Text}" FontSize="11">
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock" BasedOn="{StaticResource Subtle}">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                        <Style.Triggers><DataTrigger Binding="{Binding Message.Text}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                                                        <!-- v0.4.43 fix: this was inverted (shown only when EMPTY), so a notification's detail line never appeared. -->
+                                                        <Setter Property="TextWrapping" Value="Wrap"/><Setter Property="TextTrimming" Value="CharacterEllipsis"/><Setter Property="MaxHeight" Value="32"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Message.Text}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                                            <DataTrigger Binding="{Binding Message.Text}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                                        </Style.Triggers>
                                                     </Style>
                                                 </TextBlock.Style>
                                             </TextBlock>
@@ -407,34 +428,14 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
-                        <TextBlock Grid.Row="1" Text="{l:T Notif.Empty}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,30">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource Subtle}">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers><DataTrigger Binding="{Binding Items.Count, ElementName=NotifList}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                        <c:EmptyState Grid.Row="1" Glyph="&#xEA8F;" Text="{l:T Notif.Empty}" Count="{Binding Items.Count, ElementName=NotifList}" Margin="0,22"/>
                     </Grid>
                 </Border>
             </Popup>
 
-            <!-- Toast -->
-            <Border x:Name="Toast" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,26" Padding="16,12" MinWidth="320" MaxWidth="560"
-                    CornerRadius="14" Background="{DynamicResource PopupBrush}" BorderThickness="1" BorderBrush="{DynamicResource StrongBorderBrush}" Visibility="Collapsed" IsHitTestVisible="True" MouseLeftButtonUp="Toast_Click">
-                <Border.Effect><DropShadowEffect BlurRadius="28" ShadowDepth="6" Opacity="0.4" Color="{DynamicResource ShadowColor}"/></Border.Effect>
-                <Border.RenderTransform><TranslateTransform/></Border.RenderTransform>
-                <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                    <Border x:Name="ToastIconBg" Width="34" Height="34" CornerRadius="10" VerticalAlignment="Top">
-                        <TextBlock x:Name="ToastIcon" Style="{StaticResource Icon}" FontSize="16" Foreground="White" HorizontalAlignment="Center"/>
-                    </Border>
-                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                        <TextBlock x:Name="ToastTitle" FontWeight="Bold" FontSize="14"/>
-                        <TextBlock x:Name="ToastText" Style="{StaticResource Subtle}" Margin="0,2,0,0"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
+            <!-- Toasts. v0.4.43: a STACK (Controls/ToastStack builds the cards) — up to three at once, each with its own
+                 countdown line; a new one pushes the others up, an expired one slides down and the gap closes. -->
+            <StackPanel x:Name="ToastHost" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,22"/>
         </Grid>
 
         <!-- v0.4.22 — first-run onboarding tour (user: «برای کسایی که اولین بار وارد میشن یک بخش بزار که اموزشی

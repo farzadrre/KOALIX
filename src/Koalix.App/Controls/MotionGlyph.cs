@@ -37,6 +37,7 @@ namespace Koalix.App.Controls;
 ///  - <c>Nav.Inspector</c> (بازرس مسیریابی): hopping packet on a marching-dash route (v0.4.26).
 ///  - <c>Nav.Ping</c>      (پایش پینگ): a signal dot with waves that ripple and shiver.
 ///  - <c>Nav.Logs</c>      (گزارش‌ها): a report sheet whose bars rise and fall.
+///  - <c>Nav.Gaming</c>    (گیمینگ): a gamepad that steers, then has its two buttons pressed (v0.4.46).
 /// Any other key renders nothing — the normal font glyph stays visible (see MainWindow's nav template).
 /// All motion honours <see cref="Fx.Enabled"/>, runs at 30 fps, and stops on unload/deactivation.
 /// </summary>
@@ -170,6 +171,7 @@ public sealed class MotionGlyph : ContentControl
                 case "Nav.Ping": (canvas, sb) = PingIcon(w, h); break;
                 case "Nav.Logs": (canvas, sb) = LogsIcon(w, h); break;
                 case "Nav.About": (canvas, sb) = AboutIcon(w, h); break;
+                case "Nav.Gaming": (canvas, sb) = GamingIcon(w, h); break;
                 default: Content = null; return; // every other section keeps its font glyph
             }
             Content = canvas;
@@ -366,6 +368,79 @@ public sealed class MotionGlyph : ContentControl
         Flash(nC, hop * 2, hop * 2 + 0.6);
 
         return (c, sb);
+    }
+
+    /* ══════ گیمینگ — v0.4.46 (user: «متحرک بودن ایکونش و تغییر بده»): the font gamepad that only "hopped" is now a
+       drawn gamepad that is being PLAYED — it steers left and right (the D-pad leans with it), then the two
+       buttons are pressed one after the other: each press pops its button, kicks the pad up and flashes three
+       rays above it. Drawn in a fixed 19×17 box and scaled, so the Gaming page reuses it large in its header. ══════ */
+
+    private (Canvas, Storyboard) GamingIcon(double w, double h)
+    {
+        var root = new Canvas { RenderTransform = new ScaleTransform(w / 19, h / 17) };
+        var kick = new TranslateTransform();
+        var lift = new Canvas { RenderTransform = kick };
+        var tilt = new RotateTransform(0, 9.5, 9);
+        var pad = new Canvas { RenderTransform = tilt };
+        root.Children.Add(lift);
+        lift.Children.Add(pad);
+
+        // the body: flat top, round shoulders, two grips
+        pad.Children.Add(Stroke(Geo("M 5.2,3.6 H 13.8 C 16.2,3.6 17.3,5.2 17.7,7.6 L 18.2,11.4 C 18.5,13.8 16.3,14.6 14.9,13.1 L 13.4,11.5 H 5.6 L 4.1,13.1 C 2.7,14.6 0.5,13.8 0.8,11.4 L 1.3,7.6 C 1.7,5.2 2.8,3.6 5.2,3.6 Z"), 1.5));
+
+        var lean = new TranslateTransform();
+        var dpad = Stroke(Geo("M 6.1,5.9 V 9.3 M 4.4,7.6 H 7.8"), 1.4);
+        dpad.RenderTransform = lean;
+        pad.Children.Add(dpad);
+
+        // the two action buttons — rounded squares (the no-ovals rule)
+        (Border, ScaleTransform) Button(double x, double y)
+        {
+            const double s = 2.2;
+            var pop = new ScaleTransform(1, 1);
+            var b = new Border { Width = s, Height = s, CornerRadius = new CornerRadius(0.7), RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = pop };
+            b.SetBinding(Border.BackgroundProperty, new Binding(nameof(Foreground)) { Source = this });
+            Canvas.SetLeft(b, x - s / 2);
+            Canvas.SetTop(b, y - s / 2);
+            pad.Children.Add(b);
+            return (b, pop);
+        }
+        var (_, popA) = Button(12.0, 8.7);
+        var (_, popB) = Button(14.3, 6.5);
+
+        // three rays above the pad — invisible at rest, they flash with every press
+        var rays = Stroke(Geo("M 9.5,0.4 V 1.8 M 5.3,0.9 L 6.1,2.1 M 13.7,0.9 L 12.9,2.1"), 1.2);
+        rays.Opacity = 0;
+        root.Children.Add(rays);
+
+        const double cycle = 2.4;
+        var sb = new Storyboard { RepeatBehavior = RepeatBehavior.Forever };
+        void Keys(DependencyObject target, DependencyProperty prop, params (double At, double Value)[] frames)
+        {
+            var a = new DoubleAnimationUsingKeyFrames { Duration = new Duration(TimeSpan.FromSeconds(cycle)) };
+            foreach (var (at, value) in frames)
+                a.KeyFrames.Add(new EasingDoubleKeyFrame(value, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(at))) { EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
+            Storyboard.SetTarget(a, target); Storyboard.SetTargetProperty(a, new PropertyPath(prop));
+            sb.Children.Add(a);
+        }
+
+        // steer: left, right, back to level
+        Keys(tilt, RotateTransform.AngleProperty, (0, 0), (0.34, -12), (0.92, 12), (1.26, 0), (cycle, 0));
+        Keys(lean, TranslateTransform.XProperty, (0, 0), (0.34, -0.8), (0.92, 0.8), (1.26, 0), (cycle, 0));
+
+        // two presses: button pops, the pad kicks up, the rays flash
+        const double first = 1.34, second = 1.62;
+        void Press(ScaleTransform pop, double at)
+        {
+            Keys(pop, ScaleTransform.ScaleXProperty, (0, 1), (at, 1), (at + 0.12, 1.6), (at + 0.30, 1), (cycle, 1));
+            Keys(pop, ScaleTransform.ScaleYProperty, (0, 1), (at, 1), (at + 0.12, 1.6), (at + 0.30, 1), (cycle, 1));
+        }
+        Press(popA, first);
+        Press(popB, second);
+        Keys(kick, TranslateTransform.YProperty, (0, 0), (first, 0), (first + 0.12, -1.5), (first + 0.26, 0), (second, 0), (second + 0.12, -1.1), (second + 0.26, 0), (cycle, 0));
+        Keys(rays, UIElement.OpacityProperty, (0, 0), (first, 0), (first + 0.12, 1), (first + 0.26, 0.25), (second + 0.12, 1), (second + 0.50, 0), (cycle, 0));
+
+        return (root, sb);
     }
 
     /* ══════ پایش پینگ — the signal waves ripple and shiver ══════ */

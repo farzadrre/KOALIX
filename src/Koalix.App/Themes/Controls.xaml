@@ -346,7 +346,7 @@
                                  IsReadOnly="{TemplateBinding IsReadOnly}" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center">
                             <TextBox.Template><ControlTemplate TargetType="TextBox"><ScrollViewer x:Name="PART_ContentHost" Margin="11,0" VerticalAlignment="Center"/></ControlTemplate></TextBox.Template>
                         </TextBox>
-                        <Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
+                        <Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade" c:Motion.PopIn="True">
                             <Border Margin="0,6,0,14" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="{TemplateBinding MaxDropDownHeight}"
                                     Background="{DynamicResource PopupBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="5">
                                 <Border.Effect><DropShadowEffect BlurRadius="20" ShadowDepth="5" Opacity="0.35" Color="{DynamicResource ShadowColor}"/></Border.Effect>
@@ -649,15 +649,23 @@
     <!-- ================= Tabs ================= -->
     <Style TargetType="TabControl">
         <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/>
+        <!-- v0.4.43: one accent pill glides between the tabs (Controls/Motion.cs places PART_TabSlider) -->
+        <Setter Property="c:Motion.TabSlide" Value="True"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TabControl">
                     <DockPanel>
                         <Border DockPanel.Dock="Top" HorizontalAlignment="Left" Background="{DynamicResource ControlBrush}" CornerRadius="12" Padding="4" Margin="0,0,0,12">
-                            <TabPanel IsItemsHost="True"/>
+                            <Grid>
+                                <Border x:Name="PART_TabSlider" HorizontalAlignment="Left" VerticalAlignment="Top" Width="0" Opacity="0" IsHitTestVisible="False"
+                                        CornerRadius="{DynamicResource ControlRadius}" Background="{DynamicResource AccentGradientBrush}">
+                                    <Border.RenderTransform><TranslateTransform/></Border.RenderTransform>
+                                </Border>
+                                <TabPanel IsItemsHost="True"/>
+                            </Grid>
                         </Border>
-                        <Border Style="{StaticResource FlatCard}" Padding="8" Margin="0">
-                            <ContentPresenter ContentSource="SelectedContent"/>
+                        <Border Style="{StaticResource FlatCard}" Padding="8" Margin="0" ClipToBounds="True">
+                            <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"/>
                         </Border>
                     </DockPanel>
                 </ControlTemplate>
@@ -678,6 +686,14 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/></Trigger>
                         <Trigger Property="IsSelected" Value="True"><Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentGradientBrush}"/><Setter Property="Foreground" Value="White"/></Trigger>
+                        <!-- once the gliding pill is in place it is the only accent; until then (and as a fallback) the tab paints its own -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsSelected" Value="True"/>
+                                <Condition Property="c:Motion.TabSlideActive" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="bd" Property="Background" Value="Transparent"/>
+                        </MultiTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -692,7 +708,8 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToolTip">
-                    <Border Background="{DynamicResource PopupBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="6">
+                    <Border Background="{DynamicResource PopupBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="10">
+                        <Border.Effect><DropShadowEffect BlurRadius="12" ShadowDepth="2" Direction="270" Opacity="0.3" Color="{DynamicResource ShadowColor}"/></Border.Effect>
                         <ContentPresenter/>
                     </Border>
                 </ControlTemplate>
@@ -744,9 +761,7 @@
                     <Grid Margin="8,2">
                         <Border x:Name="hover" CornerRadius="{DynamicResource ControlRadius}" Background="{DynamicResource ControlHoverBrush}" Opacity="0"/>
                         <Border x:Name="sel" CornerRadius="{DynamicResource ControlRadius}" Background="{DynamicResource NavSelectedBrush}" BorderBrush="{DynamicResource AccentSoftBrush}" BorderThickness="1" Opacity="0"/>
-                        <Border x:Name="pill" Width="4" Height="18" CornerRadius="2" HorizontalAlignment="Left" Background="{DynamicResource AccentGradientBrush}" RenderTransformOrigin="0.5,0.5" Opacity="0">
-                            <Border.RenderTransform><ScaleTransform ScaleY="0.2"/></Border.RenderTransform>
-                        </Border>
+                        <!-- v0.4.43: the accent rail is no longer per item — MainWindow draws ONE rail (NavRail) that glides between sections. -->
                         <ContentPresenter x:Name="content" Margin="14,10" RenderTransformOrigin="0.35,0.5">
                             <ContentPresenter.RenderTransform><ScaleTransform ScaleX="1" ScaleY="1"/></ContentPresenter.RenderTransform>
                         </ContentPresenter>
@@ -774,8 +789,6 @@
                             <Trigger.EnterActions>
                                 <BeginStoryboard><Storyboard>
                                     <DoubleAnimation Storyboard.TargetName="sel" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.2"/>
-                                    <DoubleAnimation Storyboard.TargetName="pill" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.15"/>
-                                    <DoubleAnimation Storyboard.TargetName="pill" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.35" EasingFunction="{StaticResource EaseSpring}"/>
                                     <DoubleAnimation Storyboard.TargetName="content" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.2"/>
                                     <DoubleAnimation Storyboard.TargetName="content" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.2"/>
                                 </Storyboard></BeginStoryboard>
@@ -783,8 +796,6 @@
                             <Trigger.ExitActions>
                                 <BeginStoryboard><Storyboard>
                                     <DoubleAnimation Storyboard.TargetName="sel" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2"/>
-                                    <DoubleAnimation Storyboard.TargetName="pill" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.15"/>
-                                    <DoubleAnimation Storyboard.TargetName="pill" Storyboard.TargetProperty="RenderTransform.ScaleY" To="0.2" Duration="0:0:0.2"/>
                                 </Storyboard></BeginStoryboard>
                             </Trigger.ExitActions>
                         </Trigger>

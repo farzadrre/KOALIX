@@ -437,10 +437,11 @@
               </StackPanel>
             </Border>
 
-            <!-- Server cards: fastest first, colored ping, star for the best profile (v0.4.3). -->
+            <!-- Server cards: fastest first, colored ping, star for the best profile (v0.4.3).
+                 v0.4.45: only the cards in view are built (VirtualizingWrapPanel) - 148 configs no longer mean 148 live cards. -->
             <ScrollViewer MaxHeight="270" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <ItemsControl ItemsSource="{Binding Profiles}">
-                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><c:VirtualizingWrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <Button Style="{StaticResource ServerCard}"

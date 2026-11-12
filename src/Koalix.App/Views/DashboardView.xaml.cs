@@ -63,8 +63,16 @@ public partial class DashboardView : System.Windows.Controls.UserControl
 
         e.Handled = true;                                 // keep the default arrow-key focus moves from fighting us
         vm.SelectProfileCommand.Execute(profiles[next]);  // via the command — it does the extra selection work
-        if (ProfilesList(this, profiles)?.ItemContainerGenerator.ContainerFromIndex(next) is FrameworkElement card)
-            card.BringIntoView();                         // null when virtualized — then just skip the scroll
+        // v0.4.45: the list is virtualized — a card outside the view does not exist yet. Scroll the list to its row
+        // first, then (once that layout pass has built it) bring the card itself into view for the page scroller.
+        if (ProfilesList(this, profiles) is { } list)
+        {
+            Descendant<Controls.VirtualizingWrapPanel>(list)?.ScrollToIndex(next);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (list.ItemContainerGenerator.ContainerFromIndex(next) is FrameworkElement card) card.BringIntoView();
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
 
         static bool IsTextEntry(DependencyObject? d)
         {
@@ -76,10 +84,12 @@ public partial class DashboardView : System.Windows.Controls.UserControl
             return false;
         }
 
-        // how many cards fit one visual row — card 235 + 10 margin (v0.4.3 ServerCard style) against the live viewport.
+        // how many cards fit one visual row — the panel knows (v0.4.45); the old estimate stays as the fallback:
+        // card 235 + 10 margin (v0.4.3 ServerCard style) against the live viewport.
         static int Columns(DependencyObject root, object profiles)
         {
             var list = ProfilesList(root, profiles);
+            if (list is not null && Descendant<Controls.VirtualizingWrapPanel>(list) is { } panel) return panel.Columns;
             var viewport = list is null ? 0.0 : Ancestor<ScrollViewer>(list)?.ViewportWidth ?? list.ActualWidth;
             return Math.Max(1, (int)Math.Floor((viewport + 10.0) / 245.0));
         }
@@ -93,6 +103,18 @@ public partial class DashboardView : System.Windows.Controls.UserControl
                 if (VisualTreeHelper.GetChild(root, i) is not DependencyObject child) continue;
                 if (child is ItemsControl ic && ReferenceEquals(ic.ItemsSource, profiles)) return ic;
                 if (ProfilesList(child, profiles) is { } deeper) return deeper;
+            }
+            return null;
+        }
+
+        static T? Descendant<T>(DependencyObject root) where T : DependencyObject
+        {
+            var count = VisualTreeHelper.GetChildrenCount(root);
+            for (var i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(root, i);
+                if (child is T hit) return hit;
+                if (Descendant<T>(child) is { } deeper) return deeper;
             }
             return null;
         }

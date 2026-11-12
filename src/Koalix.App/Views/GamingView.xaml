@@ -21,6 +21,10 @@
             <DoubleAnimation Storyboard.TargetProperty="RenderTransform.Y" To="0" Duration="0:0:0.26" EasingFunction="{StaticResource EaseOut}"/>
           </Storyboard></BeginStoryboard></Trigger.ExitActions>
         </Trigger>
+        <!-- v0.4.46: a boost that is on wears the accent outline (its tile and wash cross-fade in the item template) -->
+        <DataTrigger Binding="{Binding IsOn}" Value="True">
+          <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        </DataTrigger>
       </Style.Triggers>
     </Style>
     <!-- Level-colored status note under each boost card (0 idle / 1 ok / 2 warn / 3 fail). -->
@@ -67,14 +71,72 @@
       <Setter Property="Margin" Value="0,0,8,8"/>
       <Setter Property="Padding" Value="12,10"/>
       <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <!-- v0.4.46: the tile's content is the console name; the drawn gamepad plays and the chevron dips while the tile is hovered. -->
+      <Setter Property="ContentTemplate">
+        <Setter.Value>
+          <DataTemplate>
+            <StackPanel Orientation="Horizontal">
+              <c:MotionGlyph x:Name="Pad" Key="Nav.Gaming" Width="19" Height="17" Foreground="{DynamicResource AccentBrush}" Margin="0,0,9,0" VerticalAlignment="Center"/>
+              <TextBlock Text="{Binding}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center"/>
+              <TextBlock x:Name="Chevron" Text="&#xE70D;" Style="{StaticResource Icon}" FontSize="10" Foreground="{DynamicResource SubtleTextBrush}" Margin="7,1,0,0" VerticalAlignment="Center">
+                <TextBlock.RenderTransform><TranslateTransform/></TextBlock.RenderTransform>
+              </TextBlock>
+            </StackPanel>
+            <DataTemplate.Triggers>
+              <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                <Setter TargetName="Pad" Property="IsActive" Value="True"/>
+                <Setter TargetName="Chevron" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                <DataTrigger.EnterActions><BeginStoryboard><Storyboard>
+                  <DoubleAnimation Storyboard.TargetName="Chevron" Storyboard.TargetProperty="RenderTransform.Y" To="2.5" Duration="0:0:0.18" EasingFunction="{StaticResource EaseOut}"/>
+                </Storyboard></BeginStoryboard></DataTrigger.EnterActions>
+                <DataTrigger.ExitActions><BeginStoryboard><Storyboard>
+                  <DoubleAnimation Storyboard.TargetName="Chevron" Storyboard.TargetProperty="RenderTransform.Y" To="0" Duration="0:0:0.24" EasingFunction="{StaticResource EaseOut}"/>
+                </Storyboard></BeginStoryboard></DataTrigger.ExitActions>
+              </DataTrigger>
+            </DataTemplate.Triggers>
+          </DataTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
   </UserControl.Resources>
 
   <Grid>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-      <StackPanel x:Name="Root">
-        <TextBlock Text="{l:T Gaming.Title}" Style="{StaticResource Title}"/>
-        <TextBlock Text="{l:T Gaming.Subtitle}" Style="{StaticResource Subtitle}"/>
+      <StackPanel x:Name="Root" c:Motion.Entrance="True">
+        <!-- v0.4.46 — the page header is a hero strip: the drawn gamepad (the same live icon as the sidebar, large) plays
+             for a few seconds when the page opens and again while the strip is hovered; on the far side a counter and a
+             twelve-segment meter show how many boosts are really on right now (filled from code-behind). -->
+        <Border x:Name="Hero" CornerRadius="{DynamicResource CardRadius}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Margin="0,0,14,14">
+          <Grid ClipToBounds="True">
+            <Border CornerRadius="15" Background="{DynamicResource AccentGradientBrush}" Opacity="0.12" IsHitTestVisible="False"/>
+            <TextBlock Text="&#xE7FC;" Style="{StaticResource Icon}" FontSize="170" Opacity="0.06" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,-62,0,-62" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5">
+              <TextBlock.RenderTransform><RotateTransform Angle="-14"/></TextBlock.RenderTransform>
+            </TextBlock>
+            <Grid Margin="20,16">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <Border x:Name="HeroTile" Width="62" Height="62" CornerRadius="18" Background="{DynamicResource AccentGradientBrush}" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                <Viewbox Width="42" Height="38">
+                  <c:MotionGlyph x:Name="HeroGlyph" Key="Nav.Gaming" Width="19" Height="17" Foreground="White"/>
+                </Viewbox>
+              </Border>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,16,0">
+                <TextBlock Text="{l:T Gaming.Title}" Style="{StaticResource Title}" Margin="0"/>
+                <TextBlock Text="{l:T Gaming.Subtitle}" Style="{StaticResource Subtitle}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+              </StackPanel>
+              <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                  <!-- the fraction always reads "3 /12", also in the right-to-left layout -->
+                  <StackPanel Orientation="Horizontal" FlowDirection="LeftToRight">
+                    <TextBlock x:Name="ActiveCount" Text="0" Style="{StaticResource Metric}" Foreground="{DynamicResource AccentTextGradientBrush}" RenderTransformOrigin="0.5,0.7"/>
+                    <TextBlock x:Name="ActiveTotal" Text="/12" Style="{StaticResource Subtle}" FontSize="14" VerticalAlignment="Bottom" Margin="4,0,0,6"/>
+                  </StackPanel>
+                  <TextBlock Text="{l:T Gaming.Hero.Active}" Style="{StaticResource Subtle}" VerticalAlignment="Bottom" Margin="8,0,0,7"/>
+                </StackPanel>
+                <StackPanel x:Name="Meter" Orientation="Horizontal" Margin="0,5,0,0"/>
+              </StackPanel>
+            </Grid>
+          </Grid>
+        </Border>
 
         <!-- ============ System boost grid (v0.4.3) ============ -->
         <Border Style="{StaticResource Card}">
@@ -117,18 +179,27 @@
               <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Border Style="{StaticResource BoostCard}" ToolTipService.InitialShowDelay="250" ToolTipService.ShowDuration="30000">
+                  <Border x:Name="Card" Style="{StaticResource BoostCard}" ToolTipService.InitialShowDelay="250" ToolTipService.ShowDuration="30000">
                     <Border.ToolTip>
                       <TextBlock MaxWidth="340" TextWrapping="Wrap" TextAlignment="Right">
                         <TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}"><Binding Path="TipKey"/><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text>
                       </TextBlock>
                     </Border.ToolTip>
+                    <Grid>
+                    <!-- v0.4.46: the "on" look — an accent wash over the whole card, cross-faded by the IsOn trigger below -->
+                    <Border x:Name="OnWash" Margin="-14,-12" CornerRadius="13" Background="{DynamicResource AccentSoftBrush}" Opacity="0" IsHitTestVisible="False"/>
                     <StackPanel>
                       <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                        <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource AccentSoftBrush}">
+                        <!-- the icon tile: soft when off, filled with the accent gradient when on; it pops when switched on,
+                             wiggles once when the card is hovered and pulses while the tweak is being applied -->
+                        <Grid x:Name="Tile" Width="34" Height="34" RenderTransformOrigin="0.5,0.5">
+                          <Grid.RenderTransform><TransformGroup><ScaleTransform/><RotateTransform/></TransformGroup></Grid.RenderTransform>
+                          <Border CornerRadius="10" Background="{DynamicResource AccentSoftBrush}"/>
+                          <Border x:Name="TileOn" CornerRadius="10" Background="{DynamicResource AccentGradientBrush}" Opacity="0"/>
                           <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="16" HorizontalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
-                        </Border>
+                          <TextBlock x:Name="GlyphOn" Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="16" HorizontalAlignment="Center" Foreground="White" Opacity="0"/>
+                        </Grid>
                         <Border Grid.Column="2" Style="{StaticResource AdminHint}" VerticalAlignment="Center">
                           <TextBlock Text="{l:T Gaming.Boost.NeedsAdmin}" FontSize="9.5" Foreground="{DynamicResource WarningBrush}"/>
                         </Border>
@@ -153,7 +224,45 @@
                         </CheckBox>
                       </Grid>
                     </StackPanel>
+                    </Grid>
                   </Border>
+                  <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsOn}" Value="True">
+                      <DataTrigger.EnterActions><BeginStoryboard><Storyboard>
+                        <DoubleAnimation Storyboard.TargetName="OnWash" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.28"/>
+                        <DoubleAnimation Storyboard.TargetName="TileOn" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.22"/>
+                        <DoubleAnimation Storyboard.TargetName="GlyphOn" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.22"/>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Tile" Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)">
+                          <EasingDoubleKeyFrame KeyTime="0:0:0.14" Value="1.2" EasingFunction="{StaticResource EaseOut}"/>
+                          <EasingDoubleKeyFrame KeyTime="0:0:0.44" Value="1" EasingFunction="{StaticResource EaseSpring}"/>
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Tile" Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)">
+                          <EasingDoubleKeyFrame KeyTime="0:0:0.14" Value="1.2" EasingFunction="{StaticResource EaseOut}"/>
+                          <EasingDoubleKeyFrame KeyTime="0:0:0.44" Value="1" EasingFunction="{StaticResource EaseSpring}"/>
+                        </DoubleAnimationUsingKeyFrames>
+                      </Storyboard></BeginStoryboard></DataTrigger.EnterActions>
+                      <DataTrigger.ExitActions><BeginStoryboard><Storyboard>
+                        <DoubleAnimation Storyboard.TargetName="OnWash" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.24"/>
+                        <DoubleAnimation Storyboard.TargetName="TileOn" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2"/>
+                        <DoubleAnimation Storyboard.TargetName="GlyphOn" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2"/>
+                      </Storyboard></BeginStoryboard></DataTrigger.ExitActions>
+                    </DataTrigger>
+                    <Trigger SourceName="Card" Property="IsMouseOver" Value="True">
+                      <Trigger.EnterActions><BeginStoryboard><Storyboard>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Tile" Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(RotateTransform.Angle)">
+                          <EasingDoubleKeyFrame KeyTime="0:0:0.12" Value="-10" EasingFunction="{StaticResource EaseOut}"/>
+                          <EasingDoubleKeyFrame KeyTime="0:0:0.26" Value="7" EasingFunction="{StaticResource EaseOut}"/>
+                          <EasingDoubleKeyFrame KeyTime="0:0:0.46" Value="0" EasingFunction="{StaticResource EaseSpring}"/>
+                        </DoubleAnimationUsingKeyFrames>
+                      </Storyboard></BeginStoryboard></Trigger.EnterActions>
+                    </Trigger>
+                    <DataTrigger Binding="{Binding Busy}" Value="True">
+                      <DataTrigger.EnterActions><BeginStoryboard Name="BusyPulse"><Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                        <DoubleAnimation Storyboard.TargetName="Tile" Storyboard.TargetProperty="Opacity" To="0.4" Duration="0:0:0.42"/>
+                      </Storyboard></BeginStoryboard></DataTrigger.EnterActions>
+                      <DataTrigger.ExitActions><StopStoryboard BeginStoryboardName="BusyPulse"/></DataTrigger.ExitActions>
+                    </DataTrigger>
+                  </DataTemplate.Triggers>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
@@ -168,7 +277,10 @@
           <Border Style="{StaticResource Card}">
             <StackPanel>
               <TextBlock Text="{l:T Gaming.Games}" Style="{StaticResource CardTitle}"/>
-              <ListBox ItemsSource="{Binding Games}" SelectedItem="{Binding Selected}" HorizontalContentAlignment="Stretch" Height="220" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource TextBrush}">
+              <Grid Height="220">
+              <!-- v0.4.46: animated empty state (Controls/EmptyState) instead of a blank box while no game is added -->
+              <c:EmptyState Glyph="&#xE7FC;" Text="{l:T Gaming.Games.Empty}" Count="{Binding Games.Count}"/>
+              <ListBox ItemsSource="{Binding Games}" SelectedItem="{Binding Selected}" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource TextBrush}">
                 <ListBox.ItemTemplate><DataTemplate>
                   <Grid Margin="0,4">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -180,6 +292,7 @@
                   </Grid>
                 </DataTemplate></ListBox.ItemTemplate>
               </ListBox>
+              </Grid>
               <WrapPanel Margin="0,8,0,0">
                 <Button Content="{l:T Gaming.AddGame}" Command="{Binding AddGameCommand}" Style="{StaticResource AccentButton}"/>
                 <Button Content="{l:T Gaming.Route}" Command="{Binding RouteThroughTunnelCommand}"/>
@@ -223,34 +336,10 @@
 
               <TextBlock Text="{l:T Gaming.Console.Pick}" FontWeight="Bold" FontSize="13" Margin="0,10,0,8"/>
               <UniformGrid Columns="2">
-                <Button Style="{StaticResource ConsoleTile}" Command="{Binding ShowGuideCommand}" CommandParameter="PS5">
-                  <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE7FC;" Style="{StaticResource Icon}" FontSize="15" Foreground="{DynamicResource AccentBrush}" Margin="0,0,9,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{l:T Gaming.Console.PS5.Name}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center"/>
-                    <TextBlock Text="&#xE70D;" Style="{StaticResource Icon}" FontSize="10" Foreground="{DynamicResource SubtleTextBrush}" Margin="7,1,0,0" VerticalAlignment="Center"/>
-                  </StackPanel>
-                </Button>
-                <Button Style="{StaticResource ConsoleTile}" Command="{Binding ShowGuideCommand}" CommandParameter="PS4">
-                  <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE7FC;" Style="{StaticResource Icon}" FontSize="15" Foreground="{DynamicResource AccentBrush}" Margin="0,0,9,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{l:T Gaming.Console.PS4.Name}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center"/>
-                    <TextBlock Text="&#xE70D;" Style="{StaticResource Icon}" FontSize="10" Foreground="{DynamicResource SubtleTextBrush}" Margin="7,1,0,0" VerticalAlignment="Center"/>
-                  </StackPanel>
-                </Button>
-                <Button Style="{StaticResource ConsoleTile}" Command="{Binding ShowGuideCommand}" CommandParameter="Xbox">
-                  <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE7FC;" Style="{StaticResource Icon}" FontSize="15" Foreground="{DynamicResource AccentBrush}" Margin="0,0,9,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{l:T Gaming.Console.Xbox.Name}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center"/>
-                    <TextBlock Text="&#xE70D;" Style="{StaticResource Icon}" FontSize="10" Foreground="{DynamicResource SubtleTextBrush}" Margin="7,1,0,0" VerticalAlignment="Center"/>
-                  </StackPanel>
-                </Button>
-                <Button Style="{StaticResource ConsoleTile}" Command="{Binding ShowGuideCommand}" CommandParameter="Switch">
-                  <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE7FC;" Style="{StaticResource Icon}" FontSize="15" Foreground="{DynamicResource AccentBrush}" Margin="0,0,9,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{l:T Gaming.Console.Switch.Name}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center"/>
-                    <TextBlock Text="&#xE70D;" Style="{StaticResource Icon}" FontSize="10" Foreground="{DynamicResource SubtleTextBrush}" Margin="7,1,0,0" VerticalAlignment="Center"/>
-                  </StackPanel>
-                </Button>
+                <Button Style="{StaticResource ConsoleTile}" Command="{Binding ShowGuideCommand}" CommandParameter="PS5" Content="{l:T Gaming.Console.PS5.Name}"/>
+                <Button Style="{StaticResource ConsoleTile}" Command="{Binding ShowGuideCommand}" CommandParameter="PS4" Content="{l:T Gaming.Console.PS4.Name}"/>
+                <Button Style="{StaticResource ConsoleTile}" Command="{Binding ShowGuideCommand}" CommandParameter="Xbox" Content="{l:T Gaming.Console.Xbox.Name}"/>
+                <Button Style="{StaticResource ConsoleTile}" Command="{Binding ShowGuideCommand}" CommandParameter="Switch" Content="{l:T Gaming.Console.Switch.Name}"/>
               </UniformGrid>
 
               <Border CornerRadius="12" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12,10" Margin="0,12,0,0">

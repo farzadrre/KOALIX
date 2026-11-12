@@ -22,7 +22,7 @@
       <Setter Property="Background" Value="{DynamicResource ControlBrush}"/>
     </Style>
   </UserControl.Resources>
-  <DockPanel>
+  <DockPanel c:Motion.Entrance="True">
     <StackPanel DockPanel.Dock="Top">
       <TextBlock Text="{l:T Dns.Title}" Style="{StaticResource Title}"/>
       <TextBlock Text="{l:T Dns.Subtitle}" Style="{StaticResource Subtitle}"/>

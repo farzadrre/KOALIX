@@ -20,7 +20,7 @@
       </Setter>
     </Style>
   </UserControl.Resources>
-  <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+  <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel c:Motion.Entrance="True">
     <TextBlock Text="{l:T Settings.Title}" Style="{StaticResource Title}"/>
     <TextBlock Text="{l:T Settings.Subtitle}" Style="{StaticResource Subtitle}"/>
 

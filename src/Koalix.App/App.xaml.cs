@@ -66,6 +66,7 @@ public partial class App : Application
             Controls.LiveBackdrop.Allowed = settings.Get(Controls.LiveBackdrop.SettingKey) != "0";
             SoundService.Load(settings); // v0.4.23: the connect/disconnect/error tones honour "ui.sounds"
             Controls.ThemeRefresh.Install(); // v0.4.42: hand-drawn controls repaint on every theme/palette change
+            Controls.Motion.Install();       // v0.4.43: right-click menus and tooltips open with a soft scale + fade
             var theme = AppHost.Get<ThemeService>();
             try { theme.Apply(Enum.TryParse<AppTheme>(settings.Get("ui.theme"), out var t) ? t : AppTheme.Dark, safe ? null : settings.Get("ui.accent")); }
             catch (Exception ex) { StartupLog.Trace("theme: " + ex); theme.Apply(AppTheme.Dark, ThemeService.DefaultAccent); }

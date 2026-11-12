@@ -270,6 +270,8 @@
   "Gaming.Failed": "failed",
   "Gaming.GameMode": "Windows Game Mode",
   "Gaming.Games": "Games",
+  "Gaming.Games.Empty": "No games yet — pick a game's .exe with “Add game…”.",
+  "Gaming.Hero.Active": "boosts on",
   "Gaming.Honest": "These tweaks reduce CPU throttling and background interference; they cannot lower your network latency to the game server. All changes are journaled and reversible.",
   "Gaming.NotSet": "not active",
   "Gaming.PowerPlan": "High performance power plan",
@@ -1126,5 +1128,7 @@
   "Update.BadgeTip": "A new KOALIX version is out — click to install / download",
   "Update.NewTitle": "New KOALIX version — {0}",
   "Update.NewBodyInstalled": "Version {0} is out (you have {1}). Click the “new version” badge at the top or open Settings › Updates to install it. Your settings and profiles are kept.",
-  "Update.NewBodyPortable": "Version {0} is out (you have {1}). Click the “new version” badge at the top to open the download page."
+  "Update.NewBodyPortable": "Version {0} is out (you have {1}). Click the “new version” badge at the top to open the download page.",
+  "Logs.Empty": "No log entries to show",
+  "Inspector.Empty": "Nothing observed yet — it fills in once you connect"
 }

@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.46 — Gaming page refresh: a played gamepad icon · live header with a boost meter · boost cards that show their state
+- **🎮 New Gaming icon, new motion:** the sidebar gamepad is now a drawn icon instead of a font glyph that only "hopped". When Gaming is selected or hovered it steers left and right, then its two buttons are pressed one after the other with a small kick and a spark above it.
+- **✨ Header strip:** the page opens with a header that carries the same gamepad large (it plays for a few seconds, then rests, and plays again while you hover the strip), a counter of how many boosts are on, and a 12-segment meter that fills as a sweep on "Apply all" and drains on "Revert all".
+- **🟣 Boost cards show whether they are on:** a card that is on gets an accent outline, a soft accent wash and a filled gradient icon tile. The tile pops when you switch a boost on, wiggles once when you hover the card, and pulses while the tweak is being applied.
+- **🌊 Entrance:** the page's sections rise in one after another and the twelve boost cards follow as a wave.
+- **🕹️ Console tiles:** PS5 / PS4 / Xbox / Switch use the drawn gamepad, which plays while the tile is hovered, and the chevron dips.
+- **📭 Empty games list:** instead of a blank box it now says how to add a game.
+
+## 0.4.45 — Dashboard opens fast with many configs: only the server cards in view are built
+- **🚀 Dashboard no longer slows down with a long server list:** the server cards on the Dashboard used to be built all at once — with 148 configs that was about 5,400 live interface elements for the 8 or so cards you can actually see, rebuilt on every visit to the page and on every re-sort. Now only the cards in view (plus one row above and below) exist; the rest are created as you scroll. In our layout test with 148 configs, rebuilding the list dropped from ~460 ms to ~20 ms and returning to the page from ~35 ms to ~7 ms.
+- **⌨️ WASD / arrow keys still walk every server:** moving the selection to a card that is out of view scrolls the list to it first.
+
+## 0.4.44 — Snappier motion: shorter transitions · lighter page swap · empty states no longer animate forever
+- **⚡ Pages arrive faster:** the page transition is now about a third shorter (the old page is gone in under 0.1 s, the new one has settled in ~0.2 s), and the step-by-step card entrance finishes in under half a second instead of almost a full second.
+- **🪶 Lighter page swap:** the page being left is drawn once and that snapshot is what fades out, so two full pages — every card with its soft shadow — are no longer redrawn on each frame of the swap.
+- **🫧 Empty states rest:** the floating icon on an empty list (Split Tunnel, Routing Inspector, Logs, Tunnels, notification panel, Ctrl+K palette) now breathes twice when it appears and then stands still. It used to loop forever, which kept its whole card redrawing — shadow included — for as long as the page was open.
+- **⏱️ Shorter everywhere else too:** the sidebar rail, the tab pill, tab content, toasts and the notification rows all move a little quicker.
+
+## 0.4.43 — Motion pass: direction-aware page transitions · gliding menu rail · sliding tab pill · soft-opening menus · stacked toasts · ringing bell · animated empty states
+- **🎬 Cards enter in steps on every page:** Settings, DNS Manager, Split Tunnel, Repair, Ping Monitor, System Proxy, Logs and Routing Inspector now bring their cards in one after another (a short rise + fade), like the Dashboard and Tunnels pages already did.
+- **↕️ Direction-aware page transitions:** the old page now fades and slides out before the new one arrives, and the direction follows the menu — a section further down comes up from below, one further up comes down from above.
+- **📍 One gliding rail in the sidebar:** instead of a separate marker per menu row, a single accent bar glides to the selected section with a small spring and stretches while it travels. It follows scrolling, window resizing and the Beginner/Advanced filter, and works in both RTL and LTR.
+- **🔘 Sliding tab pill:** in every tab strip the accent pill slides and resizes from the old tab to the new one instead of jumping.
+- **🪟 Soft-opening menus:** dropdowns, right-click menus, the Ctrl+K palette, the notification panel and tooltips open with a small scale + fade; tooltips also get a soft shadow.
+- **🍞 Better toasts:** up to three toasts stack instead of replacing each other; each has a countdown line, an icon that pops in, and slides down when it leaves. Errors stay longer. Clicking a toast dismisses it.
+- **🔔 Livelier bell:** the bell swings when a new notification arrives, the unread dot pops in, and the rows of the notification list enter in steps.
+- **🫧 Animated empty states:** empty lists (Tunnels, Split Tunnel rules, Logs, the three Routing Inspector tabs, the notification panel and the Ctrl+K palette) show a floating icon tile over a breathing halo with a short hint, instead of a bare grey sentence or nothing at all.
+- All of the above obey **Settings › Effects** — with effects off (or in safe mode) pages swap instantly, the rail and the tab pill jump, and nothing loops.
+
 ## 0.4.42 — Beginner / Advanced interface switch · quick “+ Add config” button · a full Guide page · new-version notice · theme repaint fix
 - **🎚️ Beginner / Advanced switch in the title bar:** a segmented `Beginner | Advanced` toggle that is always in view. Beginner hides the expert pages (DNS Manager, Routing Inspector, Ping Monitor, Gaming, System Proxy, Logs) from the sidebar and the Ctrl+K palette, and folds away expert widgets — server sort/test tools, the server map, speed/latency charts, per-app usage, engine & tag pickers on Tunnels, the config preview pane, and the advanced settings (floating widget, kill-foreign-VPN, global hotkey, revert-on-exit, custom DNS, update feed, default mode). Nothing is disabled; every setting keeps working. Fresh installs start in Beginner; existing users stay in Advanced. The choice is saved.
 - **➕ Add config button on the Dashboard:** a floating `+` button that expands to “Add config” on hover and jumps straight to Tunnels with the import box open and focused.
