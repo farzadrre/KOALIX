@@ -19,5 +19,6 @@
     <ProjectReference Include="..\..\src\Koalix.SplitTunneling\Koalix.SplitTunneling.csproj" />
     <ProjectReference Include="..\..\src\Koalix.SystemIntegration\Koalix.SystemIntegration.csproj" />
     <ProjectReference Include="..\..\src\Koalix.Infrastructure\Koalix.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Koalix.Aether\Koalix.Aether.csproj" /> <!-- v0.4.48 -->
   </ItemGroup>
 </Project>

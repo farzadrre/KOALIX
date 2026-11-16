@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.4.49 — WARP chain & Aether integration, split tunneling, fold controls
+
+### Aether Integration & Split Tunneling
+- **🛰️ Aether section:** the full Aether tunnel — Aether-GUI's complete option set (protocol MASQUE/WireGuard/gool/MiM, scan modes, noize presets, IPv4/v6, quick reconnect, Tor/Psiphon overlays, Zero Trust) as its own card, with the engine (aether.exe, official GitHub release, SHA-256 verified) downloaded on first connect. One-click GAMING / STEALTH / DEFAULT presets.
+- **🔧 Per-app split tunneling for Aether:** the Aether card's "پروکسی سیستم" toggle used to hijack WinINET for the WHOLE OS (Aether-GUI's sysproxy), which ignores per-app rules on the Split Tunneling page entirely — apps marked Direct were tunneled anyway. The toggle now runs `AetherSplitTunnel`: a sing-box TUN session compiled from the SAME SplitPolicy every engine uses, with Aether's SOCKS5 (127.0.0.1:1819) as the proxy exit. Include mode tunnels only the apps you picked; Exclude leaves your Direct apps direct; domain rules, split DNS, QUIC block and the Iran preset behave normally. Applies live while connected with routing-loop guard for aether.exe.
+- **🔗 Chain-AETHER mode auto-starts the engine:** connecting with the chain set to Aether auto-starts the engine (downloading it on first use with progress in status line) before chained connect.
+
+### WARP Chain: Config Combination (WARP × Psiphon) for Gaming Over Workers
+- **🔗 New dashboard card "زنجیره و ترکیب کانفیگ":** combine the selected config with WARP or Psiphon from the dashboard — a master switch (off = plain single config) and combo box with four modes. Changes persist immediately; app prompts to reconnect when a tunnel is up.
+- **🎮 Gaming over workers (headline mode):** worker configs are TCP-only (route rules reject UDP). The gaming mode adds a real Cloudflare WARP WireGuard endpoint and routes game UDP through it while TCP stays on the worker config. Panel configs' generic `{"network":"udp","action":"reject"}` rule is removed automatically when chain is on.
+- **🌍 Full WARP exit:** everything (TCP + UDP) leaves through WARP; remote DNS detour moves to WARP as well.
+- **⛓️ Full chain (WARP over config):** WARP endpoint is dialed through the selected config (detour) for upstreams carrying UDP (hysteria2, tuic, VPS).
+- **🧅 Psiphon exit:** traffic exits through Psiphon 3 Windows client's local SOCKS proxy for web unblocking.
+- **🆓 One-click free WARP identity:** "ساخت هویت WARP" generates keypair with sing-box CLI and registers with Cloudflare API (wgcf/BPB compatible, client_id reserved bytes). Private keys stored DPAPI-protected. Also supports importing from WireGuard JSON or .conf.
+- **🔧 WARP keygen compatibility:** sing-box 1.14 changed `generate wg-keypair` from JSON to text lines (`PrivateKey: … / PublicKey: …`). Parser supports both 1.12 JSON and 1.14 text formats.
+- **⚙️ sing-box auto-detection & manual path:** `EnginePaths.FindSingBoxExe()` searches manual override → KOALIX engines folder → PATH → Program Files/winget/scoop. Settings → Engines provides manual path input row.
+- **📦 Combo export:** one-click export to standalone sing-box JSON for sing-box / Hiddify / NekoBox on Android/iOS.
+
+### Advanced Tunnels & UI Polish
+- **🗂️ Advanced Tunnels tabbed card («تونل‌های پیشرفته»):** merges WARP chain and Aether cards behind one slim tabbed card — dashboard stays clean; click opens chosen panel, «بستن» folds it away.
+- **📦 Default folded state:** Advanced-Tunnels card and Server Map ship folded to their header row on first run to keep the dashboard tidy; choices persist.
+- **🖱️ Fold chevron precision:** the fold chevron is a real button (hand cursor, accent-lit on hover). Handlers live on the entire header row with guards letting child controls (combos, buttons, switches) keep their click behavior.
+- **🧪 Regression test suite:** 318 unit & integration tests covering Aether split sessions, chain configs, sing-box resolver, and card fold contracts.
+
 ## 0.4.46 — Gaming page refresh: a played gamepad icon · live header with a boost meter · boost cards that show their state
 - **🎮 New Gaming icon, new motion:** the sidebar gamepad is now a drawn icon instead of a font glyph that only "hopped". When Gaming is selected or hovered it steers left and right, then its two buttons are pressed one after the other with a small kick and a spark above it.
 - **✨ Header strip:** the page opens with a header that carries the same gamepad large (it plays for a few seconds, then rests, and plays again while you hover the strip), a counter of how many boosts are on, and a 12-segment meter that fills as a sweep on "Apply all" and drains on "Revert all".

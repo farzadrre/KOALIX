@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koalix.Core\Koalix.Core.csproj" />
+    <ProjectReference Include="..\Koalix.Tunneling\Koalix.Tunneling.csproj" />
+    <ProjectReference Include="..\Koalix.Infrastructure\Koalix.Infrastructure.csproj" />
+    <ProjectReference Include="..\Koalix.SystemIntegration\Koalix.SystemIntegration.csproj" />
+    <ProjectReference Include="..\Koalix.SplitTunneling\Koalix.SplitTunneling.csproj" /> <!-- v0.4.49 — split-aware system proxy -->
+    <ProjectReference Include="..\Koalix.SingBox\Koalix.SingBox.csproj" /> <!-- v0.4.49 — AetherSplitTunnel runs a sing-box session -->
+  </ItemGroup>
+</Project>

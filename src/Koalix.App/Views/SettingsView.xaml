@@ -295,7 +295,7 @@
         <TextBlock Text="{l:T Settings.Engines}" Style="{StaticResource CardTitle}"/>
         <Grid Margin="0,0,0,6">
           <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-          <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+          <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
           <TextBlock Text="sing-box" FontWeight="SemiBold" VerticalAlignment="Center" Style="{StaticResource Latin}" HorizontalAlignment="Left"/>
           <TextBlock Grid.Column="1" Text="{Binding SingBoxVersion}" VerticalAlignment="Center" Style="{StaticResource Subtle}"/>
           <Button Grid.Column="2" Content="{l:T Settings.InstallUpdate}" Command="{Binding InstallSingBoxCommand}"/>
@@ -318,6 +318,13 @@
               </StackPanel>
             </Button.Content>
           </Button>
+          <!-- v0.4.47.1 — manual sing-box.exe path: system installs (PATH / winget / scoop / a hand-copied exe) are
+               auto-detected by EnginePaths.FindSingBoxExe; this row is the escape hatch when nothing is found. -->
+          <TextBlock Grid.Row="4" Text="{l:T Settings.SingBoxPath}" Style="{StaticResource Subtle}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,8,0,0"/>
+          <StackPanel Grid.Row="4" Grid.Column="1">
+            <TextBox Text="{Binding SingBoxPathText, UpdateSourceTrigger=LostFocus}" Style="{StaticResource LatinBox}" HorizontalAlignment="Stretch" ToolTip="{l:T Settings.SingBoxPathHint}"/>
+            <TextBlock Text="{l:T Settings.SingBoxPathHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+          </StackPanel>
         </Grid>
         <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.OfficialWireGuard}" IsChecked="{Binding OfficialWireGuard}" IsEnabled="{Binding OfficialWireGuardInstalled}" HorizontalAlignment="Left" MinWidth="380"/>
         <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.UseWireSock}" IsChecked="{Binding UseWireSock}" IsEnabled="{Binding WireSockInstalled}" HorizontalAlignment="Left" MinWidth="380"/>

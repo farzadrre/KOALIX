@@ -36,6 +36,7 @@
     <ProjectReference Include="..\Koalix.SplitTunneling\Koalix.SplitTunneling.csproj" />
     <ProjectReference Include="..\Koalix.SystemIntegration\Koalix.SystemIntegration.csproj" />
     <ProjectReference Include="..\Koalix.Infrastructure\Koalix.Infrastructure.csproj" />
+    <ProjectReference Include="..\Koalix.Aether\Koalix.Aether.csproj" /> <!-- v0.4.48 — Aether tunnel section -->
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Localization\*.json" />

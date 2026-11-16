@@ -386,6 +386,99 @@
         </Setter>
     </Style>
 
+    <!-- Expander: v0.4.48.2 — the stock WPF template paints its header with the LIGHT Aero foreground
+         (black), unreadable on the dark theme (field report: «متن‌ها سیاهه، به پس‌زمینهٔ دارک نمی‌خوره»).
+         Themed replacement: text follows TextBrush, an accent chevron rotates on expand (same motion as the
+         combo), the header row is a hover pill. -->
+    <Style TargetType="Expander">
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <StackPanel>
+                        <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Focusable="False" FocusVisualStyle="{x:Null}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="hdr" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="8" Padding="8,6">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock x:Name="chev" Text="&#xE70D;" Style="{StaticResource Icon}" FontSize="10" Foreground="{DynamicResource AccentBrush}" Margin="0,0,8,0"
+                                                       VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5"><TextBlock.RenderTransform><RotateTransform/></TextBlock.RenderTransform></TextBlock>
+                                            <ContentPresenter ContentSource="Content" RecognizesAccessKey="True" VerticalAlignment="Center" TextElement.Foreground="{DynamicResource TextBrush}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="hdr" Property="Background" Value="{DynamicResource ControlBrush}"/><Setter TargetName="hdr" Property="BorderBrush" Value="{DynamicResource BorderBrush}"/></Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="chev" Storyboard.TargetProperty="RenderTransform.Angle" To="180" Duration="0:0:0.18"/></Storyboard></BeginStoryboard></Trigger.EnterActions>
+                                            <Trigger.ExitActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="chev" Storyboard.TargetProperty="RenderTransform.Angle" To="0" Duration="0:0:0.18"/></Storyboard></BeginStoryboard></Trigger.ExitActions>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <!-- the chevron sits on the START (right in RTL) side so it reads as a disclosure arrow in both flow directions -->
+                        <ContentPresenter x:Name="body" Visibility="Collapsed"/>
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True"><Setter TargetName="body" Property="Visibility" Value="Visible"/></Trigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- v0.4.48.2 — segmented tab strip (user: «بخش warp و aether رو از داشبورد جدا کن ... یه حالت تب‌طور بذاری
+         و فلش داشته باشه، بزنی روش باز شه که شلوغ نشه»). RadioButtons styled as pill tabs; put each inside
+         a panel named per tab and drive panel visibility from the same checked state. -->
+    <Style x:Key="SegTab" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{DynamicResource SubtleTextBrush}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Padding" Value="14,7"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Margin" Value="0,0,6,0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Grid>
+                        <!-- v0.4.48.3: the ScaleTransform lives ON the animated Border itself — the first cut put it
+                             on the parent Grid, so 'RenderTransform.ScaleX' on 'b' resolved to null and the app threw
+                             InvalidOperationException at startup the moment the default tab checked (field report:
+                             «خرابه باز نمیشه», startup.log). -->
+                        <Border x:Name="b" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="9" RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform><ScaleTransform/></Border.RenderTransform>
+                        </Border>
+                        <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="b" Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="b" Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+                            <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                            <Trigger.EnterActions><BeginStoryboard><Storyboard>
+                                <DoubleAnimation Storyboard.TargetName="b" Storyboard.TargetProperty="RenderTransform.ScaleX" From="0.95" To="1" Duration="0:0:0.25" EasingFunction="{StaticResource EaseSpring}"/>
+                                <DoubleAnimation Storyboard.TargetName="b" Storyboard.TargetProperty="RenderTransform.ScaleY" From="0.95" To="1" Duration="0:0:0.25" EasingFunction="{StaticResource EaseSpring}"/>
+                            </Storyboard></BeginStoryboard></Trigger.EnterActions>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- CheckBox: rounded check; "Switch" = animated toggle switch. -->
     <Style TargetType="CheckBox">
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>

@@ -67,7 +67,11 @@ public sealed class XrayEngine : SingBoxEngine
     protected override JsonObject BuildConfig(TunnelProfile profile, SplitPolicy policy, SingBoxBuildOptions o)
     {
         var upstream = new JsonObject { ["type"] = "socks", ["tag"] = "proxy", ["server"] = "127.0.0.1", ["server_port"] = _socksPort, ["version"] = "5", ["udp_over_tcp"] = false };
-        return SingBoxConfigBuilder.Build(upstream, false, policy, o with { AlwaysDirectExecutables = [Paths.XrayExe], SinkholeViaProxy = true });
+        var cfg = SingBoxConfigBuilder.Build(upstream, false, policy, o with { AlwaysDirectExecutables = [Paths.XrayExe], SinkholeViaProxy = true });
+        // v0.4.47 — the chain lives on the sing-box side (in front of the local Xray SOCKS): WARP gaming/exit ride
+        // here, the Xray JSON itself is untouched. Xray's SOCKS inbound is UDP-enabled, so a WARP-over-proxy chain
+        // through it can even carry UDP when the upstream (a real server) does.
+        return ApplyChain(cfg, policy);
     }
 
     public override async Task<EngineValidation> ValidateAsync(TunnelProfile profile, SplitPolicy policy, CancellationToken ct)

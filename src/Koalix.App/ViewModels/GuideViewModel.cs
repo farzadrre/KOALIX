@@ -77,6 +77,8 @@ public sealed partial class GuideViewModel : PageViewModel
 
         Lessons.Add(new GuideTopic("AddConfig", "\uE71B", run: () => _dash.OpenAddConfigCommand.Execute(null)));
         Lessons.Add(new GuideTopic("Connect", "\uE7E8", run: () => Go("Nav.Dashboard")));
+        Lessons.Add(new GuideTopic("Aether", "\uE968", run: () => Go("Nav.Dashboard"))); // v0.4.48 — the Aether tunnel section
+        Lessons.Add(new GuideTopic("AetherGaming", "\uE7FC", advanced: true, run: () => Go("Nav.Dashboard"))); // v0.4.48 — which options are the gaming ones
         Lessons.Add(new GuideTopic("Ping", "\uEC05"));
         Lessons.Add(new GuideTopic("Subs", "\uE753", run: () => Go("Nav.Profiles")));
         Lessons.Add(new GuideTopic("Split", "\uE8AB", run: () => Go("Nav.Split")));
@@ -113,7 +115,7 @@ public sealed partial class GuideViewModel : PageViewModel
     {
         try
         {
-            Steps[0].Done = File.Exists(_engines.SingBoxExe) || File.Exists(_engines.XrayExe)
+            Steps[0].Done = _engines.FindSingBoxExe() is not null || File.Exists(_engines.XrayExe) // v0.4.47.1: system sing-box counts
                             || File.Exists(EnginePaths.WireGuardExe) || EnginePaths.WireSockExe is not null;
             Steps[1].Done = _dash.Profiles.Any(p => !p.IsAuto);
             Steps[2].Done = _dash.Profiles.Any(p => !p.IsAuto && !string.IsNullOrWhiteSpace(p.Ping));

@@ -40,7 +40,7 @@ public sealed partial class AboutViewModel : PageViewModel
     {
         try
         {
-            HasSingBox = File.Exists(_engines.SingBoxExe);
+            HasSingBox = _engines.FindSingBoxExe() is not null; // v0.4.47.1: system installs count too
             HasXray = File.Exists(_engines.XrayExe);
             HasWireGuard = File.Exists(EnginePaths.WireGuardExe);
             HasWireSock = EnginePaths.WireSockExe is { } ws && File.Exists(ws);

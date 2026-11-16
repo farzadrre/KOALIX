@@ -281,7 +281,7 @@ public sealed partial class ProfilesViewModel : PageViewModel
             var results = await Task.Run(() => new ProfileLatencyTester(_paths).TestAsync(rows.Select(r => r.Profile).ToList(), progress, _testCts.Token));
             var ok = results.Count(r => r.Ms is not null);
             StatusMessage = L.Format("Profiles.TestReport", ok, results.Count);
-            if (!File.Exists(_paths.SingBoxExe)) StatusMessage += "\n" + L["Profiles.TestTcpOnly"];
+            if (_paths.FindSingBoxExe() is null) StatusMessage += "\n" + L["Profiles.TestTcpOnly"]; // v0.4.47.1: system sing-box counts
             // v0.4.20 — auto-clean: profiles whose test FAILED are removed right away (big subs stay tidy).
             if (AutoClean) CleanDead(results, auto: true);
         }
@@ -353,7 +353,7 @@ public sealed partial class ProfilesViewModel : PageViewModel
             var results = await Task.Run(() => new ProfileLatencyTester(_paths).GamingTestAsync(rows.Select(r => r.Profile).ToList(), progress, _gamingCts.Token));
             var good = results.Count(r => r.Verdict == GamingVerdict.Good);
             StatusMessage = L.Format("Profiles.GamingReport", good, results.Count);
-            if (!File.Exists(_paths.SingBoxExe)) StatusMessage += "\n" + L["Profiles.TestTcpOnly"];
+            if (_paths.FindSingBoxExe() is null) StatusMessage += "\n" + L["Profiles.TestTcpOnly"]; // v0.4.47.1: system sing-box counts
         }
         catch (OperationCanceledException) { StatusMessage = L["Common.Cancelled"]; }
         catch (Exception ex) { StatusMessage = Redactor.Redact(ex.Message); }

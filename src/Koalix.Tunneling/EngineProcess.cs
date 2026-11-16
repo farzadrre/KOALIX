@@ -14,8 +14,13 @@ public sealed class EngineProcess : IAsyncDisposable
     private nint _job;
     private bool _stopping;
     private readonly LogCategory _category;
+    private readonly Dictionary<string, string> _environment = new();
 
     public EngineProcess(LogCategory category) => _category = category;
+
+    /// <summary>v0.4.48 — extra environment variables for the NEXT Start (e.g. Aether's AETHER_* vars, which must
+    /// not be command-line flags). Set BEFORE Start; cleared after the process launches.</summary>
+    public void SetEnvironment(string key, string value) => _environment[key] = value;
 
     public event Action<LogCategory, string>? Output;
     /// <summary>v0.4.18 — the SAME lines as <see cref="Output"/>, but BEFORE redaction. Only consumers that must
@@ -33,6 +38,8 @@ public sealed class EngineProcess : IAsyncDisposable
         var psi = new ProcessStartInfo(exe) { WorkingDirectory = workingDir, UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
         foreach (var a in args) psi.ArgumentList.Add(a);
         var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        foreach (var (k, v) in _environment) psi.Environment[k] = v; // v0.4.48: AETHER_* & friends
+        _environment.Clear();
         p.OutputDataReceived += (_, e) => { if (e.Data is { } d) { RawLine?.Invoke(d); Output?.Invoke(_category, Redactor.Redact(d)); } };
         p.ErrorDataReceived += (_, e) => { if (e.Data is { } d) { RawLine?.Invoke(d); Output?.Invoke(_category, Redactor.Redact(d)); } };
         p.Exited += (_, _) => { if (!_stopping) UnexpectedExit?.Invoke(SafeExitCode(p)); };

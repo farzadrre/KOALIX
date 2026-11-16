@@ -70,6 +70,7 @@ public sealed partial class SettingsViewModel : PageViewModel
 {
     private readonly SettingsRepository _s;
     private readonly EngineManager _engines;
+    private readonly Koalix.Tunneling.EnginePaths _enginePaths;
     private readonly ThemeService _theme;
     public IReadOnlyList<string> Languages { get; } = ["fa", "en"];
     public IReadOnlyList<AppTheme> Themes { get; } = Enum.GetValues<AppTheme>();
@@ -197,9 +198,11 @@ public sealed partial class SettingsViewModel : PageViewModel
         Controls.LiveBackdrop.Allowed = value;
     }
 
-    public SettingsViewModel(SettingsRepository s, EngineManager engines, ThemeService theme, UpdateService updates, WidgetService widget)
+    public SettingsViewModel(SettingsRepository s, EngineManager engines, Koalix.Tunneling.EnginePaths enginePaths, ThemeService theme, UpdateService updates, WidgetService widget)
     {
-        _s = s; _engines = engines; _theme = theme; _updates = updates; _widget = widget;
+        _s = s; _engines = engines; _enginePaths = enginePaths; _theme = theme; _updates = updates; _widget = widget;
+        // v0.4.47.1 — the manual sing-box.exe path feeds EnginePaths.FindSingBoxExe (system installs are auto-detected).
+        _singBoxPathText = s.Get("engine.singbox.path") ?? "";
         SyncWidget();
         widget.Changed += () => Ui(SyncWidget);
         _uiStyle = ThemeService.StyleName;
@@ -344,6 +347,17 @@ public sealed partial class SettingsViewModel : PageViewModel
         await AppHost.Get<Koalix.Tunneling.ConnectionManager>().DisconnectAsync(CancellationToken.None);
         File.Delete(AppHost.Get<AppPaths>().CrashMarker);
         _updates.ApplyAndRestart();
+    }
+
+    /// <summary>v0.4.47.1 — manual sing-box.exe path. Empty = auto-detect (override → KOALIX engines folder → PATH →
+    /// common install locations). Set but missing files are ignored by the resolver, never a hard failure.</summary>
+    [ObservableProperty] private string _singBoxPathText = "";
+
+    partial void OnSingBoxPathTextChanged(string value)
+    {
+        var v = value.Trim();
+        _s.Set("engine.singbox.path", v);
+        _enginePaths.SingBoxPathOverride = v;
     }
 
     public override void OnActivated()

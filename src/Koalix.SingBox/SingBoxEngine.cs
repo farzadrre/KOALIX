@@ -51,6 +51,9 @@ public class SingBoxEngine : ITunnelEngine
     public bool FragmentEnabled { get; set; } = true;
     /// <summary>v0.4.28 — mux multiplexing (needs a mux-capable server; opt-in). Setting "net.mux". Xray engine only.</summary>
     public bool MuxEnabled { get; set; }
+    /// <summary>v0.4.47 — config combination (chain): WARP gaming/exit/over-proxy or local Psiphon, applied on top of
+    /// the built config. The dashboard card writes the "chain.*" settings; AppHost feeds them here per engine.</summary>
+    public ChainOptions Chain { get; set; } = new();
 
     public event Action<LogCategory, string>? LogLine;
     public event Action<int>? UnexpectedExit;
@@ -176,6 +179,7 @@ public class SingBoxEngine : ITunnelEngine
     /// <summary>Builds the final sing-box JSON for the profile. Overridden by Xray/WireGuard engines that front through sing-box.</summary>
     protected virtual JsonObject BuildConfig(TunnelProfile profile, SplitPolicy policy, SingBoxBuildOptions o)
     {
+        JsonObject cfg;
         switch (profile.Source)
         {
             case ProfileSource.ShareLink:
@@ -184,7 +188,8 @@ public class SingBoxEngine : ITunnelEngine
                     var errors = node.Validate();
                     if (errors.Count > 0) throw new InvalidDataException(string.Join(", ", errors));
                     if (!SingBoxConfigBuilder.IsNativelySupported(node, out var why)) throw new NotSupportedException(why);
-                    return SingBoxConfigBuilder.Build(SingBoxConfigBuilder.Outbound(node), false, policy, o);
+                    cfg = SingBoxConfigBuilder.Build(SingBoxConfigBuilder.Outbound(node), false, policy, o);
+                    break;
                 }
             case ProfileSource.SingBoxJson:
                 {
@@ -196,15 +201,24 @@ public class SingBoxEngine : ITunnelEngine
                     // the entry point the config was designed around. Field diagnosis aid: always log the choice.
                     var tag = SingBoxConfigBuilder.PickTunnelTarget(user, candidates);
                     RaiseLog(LogCategory.SingBox, $"User config: tunnel target outbound '{Redactor.Redact(tag)}'");
-                    return SingBoxConfigBuilder.MergeUserConfig(user, tag, policy, o);
+                    cfg = SingBoxConfigBuilder.MergeUserConfig(user, tag, policy, o);
+                    break;
                 }
             default: throw new NotSupportedException($"{profile.Source} is not a sing-box profile");
         }
+        return ApplyChain(cfg, policy);
     }
+
+    /// <summary>v0.4.47 — lays the chain (WARP/Psiphon combination) over the built config when enabled. Applied in BOTH
+    /// validate and start paths (BuildConfig is common), so `sing-box check` sees the final shape incl. the chain.</summary>
+    protected JsonObject ApplyChain(JsonObject cfg, SplitPolicy policy) =>
+        Chain.Enabled
+            ? ChainConfig.Apply(cfg, SplitRuleCompiler.ProxyTag, Chain, policy, m => RaiseLog(LogCategory.SingBox, m))
+            : cfg;
 
     public virtual async Task<EngineValidation> ValidateAsync(TunnelProfile profile, SplitPolicy policy, CancellationToken ct)
     {
-        if (!File.Exists(Paths.SingBoxExe)) return EngineValidation.Fail("Engine.Error.SingBoxMissing");
+        if (Paths.FindSingBoxExe() is not { } sbExe) return EngineValidation.Fail("Engine.Error.SingBoxMissing"); // v0.4.47.1: system sing-box counts too
         ApplyCloudflareDnsGuard(profile); // v0.4.24: worker-fronted profiles must not inherit a Cloudflare tunnel DNS
         await RunPoisonGuardAsync(profile, ct); // v0.4.28: system-DNS-vs-DoH verdict before any config is built
         JsonObject cfg;
@@ -221,7 +235,8 @@ public class SingBoxEngine : ITunnelEngine
         var path = WriteConfig(cfg, "check");
         try
         {
-            var r = await EngineProcess.RunToEndAsync(Paths.SingBoxExe, ["check", "-c", path, "--disable-color"], Paths.RuntimeDir, TimeSpan.FromSeconds(20), ct);
+            var sbExe = Paths.FindSingBoxExe() ?? Paths.SingBoxExe; // v0.4.47.1: fall back to the managed path for a precise error
+            var r = await EngineProcess.RunToEndAsync(sbExe, ["check", "-c", path, "--disable-color"], Paths.RuntimeDir, TimeSpan.FromSeconds(20), ct);
             return r.Success ? EngineValidation.Success : EngineValidation.Fail((r.StdErr + r.StdOut).Trim());
         }
         finally { TryDelete(path); }
@@ -247,7 +262,10 @@ public class SingBoxEngine : ITunnelEngine
         _configPath = WriteConfig(cfg, "run");
         HealthProxyPort = o.HealthPort;
         StatsApi = (new Uri($"http://127.0.0.1:{o.ClashApiPort}"), o.ClashApiSecret);
-        _proc.Start(Paths.SingBoxExe, ["run", "-c", _configPath, "-D", Paths.RuntimeDir, "--disable-color"], Paths.RuntimeDir);
+        // v0.4.47.1: resolve like everywhere else (override → managed → PATH → common installs) and say which binary runs.
+        if (Paths.FindSingBoxExe() is not { } sbExe) throw new InvalidOperationException("Engine.Error.SingBoxMissing");
+        RaiseLog(LogCategory.SingBox, $"sing-box binary: {sbExe}");
+        _proc.Start(sbExe, ["run", "-c", _configPath, "-D", Paths.RuntimeDir, "--disable-color"], Paths.RuntimeDir);
         return Task.CompletedTask;
     }
 

@@ -59,7 +59,7 @@ public sealed record SingBoxBuildOptions
     public IReadOnlyList<string> BypassServerIps { get; init; } = [];
 
     /// <summary>The TUN inbound shared by the generated and the merged configs.</summary>
-    internal JsonObject TunInbound()
+    public JsonObject TunInbound() // v0.4.49: public — AetherSplitTunnel builds a TUN session too
     {
         var tun = new JsonObject
         {

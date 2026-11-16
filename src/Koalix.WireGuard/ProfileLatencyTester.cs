@@ -26,9 +26,10 @@ public sealed class ProfileLatencyTester(EnginePaths paths)
         var results = new List<LatencyResult>();
         var real = new List<(TunnelProfile P, JsonObject Node, bool Endpoint)>();
         var tcp = new List<TunnelProfile>();
+        var sbExe = paths.FindSingBoxExe(); // v0.4.47.1: system sing-box counts too
         foreach (var p in profiles)
         {
-            if (File.Exists(paths.SingBoxExe) && TryOutbound(p, out var node, out var isEndpoint)) real.Add((p, node!, isEndpoint));
+            if (sbExe is not null && TryOutbound(p, out var node, out var isEndpoint)) real.Add((p, node!, isEndpoint));
             else tcp.Add(p);
         }
 
@@ -104,7 +105,7 @@ public sealed class ProfileLatencyTester(EnginePaths paths)
         var list = new List<LatencyResult>();
         try
         {
-            proc.Start(paths.SingBoxExe, ["run", "-c", file, "-D", paths.RuntimeDir, "--disable-color"], paths.RuntimeDir);
+            proc.Start(paths.FindSingBoxExe() ?? paths.SingBoxExe, ["run", "-c", file, "-D", paths.RuntimeDir, "--disable-color"], paths.RuntimeDir);
             await WaitListeningAsync(ports[0], ct);
             var tasks = items.Select(async (it, i) =>
             {
@@ -195,9 +196,10 @@ public sealed class ProfileLatencyTester(EnginePaths paths)
         var results = new List<GamingResult>();
         var real = new List<(TunnelProfile P, JsonObject Node, bool Endpoint)>();
         var rest = new List<TunnelProfile>();
+        var gamingExe = paths.FindSingBoxExe(); // v0.4.47.1: system sing-box counts too
         foreach (var p in profiles)
         {
-            if (File.Exists(paths.SingBoxExe) && TryOutbound(p, out var node, out var ep)) real.Add((p, node!, ep));
+            if (gamingExe is not null && TryOutbound(p, out var node, out var ep)) real.Add((p, node!, ep));
             else rest.Add(p);
         }
         foreach (var chunk in real.Chunk(Batch))
@@ -249,7 +251,7 @@ public sealed class ProfileLatencyTester(EnginePaths paths)
         var list = new List<GamingResult>();
         try
         {
-            proc.Start(paths.SingBoxExe, ["run", "-c", file, "-D", paths.RuntimeDir, "--disable-color"], paths.RuntimeDir);
+            proc.Start(paths.FindSingBoxExe() ?? paths.SingBoxExe, ["run", "-c", file, "-D", paths.RuntimeDir, "--disable-color"], paths.RuntimeDir);
             await WaitListeningAsync(ports[0], ct);
             var tasks = items.Select(async (it, i) =>
             {

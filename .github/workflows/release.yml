@@ -70,6 +70,11 @@ jobs:
           dotnet publish src/Koalix.App/Koalix.App.csproj -c Release -r win-x64 --self-contained true -p:Version=${{ steps.ver.outputs.version }} -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/portable
           Copy-Item artifacts/portable/KOALIX.exe "artifacts/KOALIX-${{ steps.ver.outputs.version }}-portable-win-x64.exe"
 
+      - name: Pack source zip
+        shell: pwsh
+        run: |
+          git archive --format=zip --output "artifacts/KOALIX-${{ steps.ver.outputs.version }}-source.zip" HEAD
+
       - name: Upload release + update feed
         env: { DOTNET_ROLL_FORWARD: Major }
         run: vpk upload github --repoUrl $env:REPO_URL --token ${{ secrets.GITHUB_TOKEN }} --publish --releaseName "KOALIX ${{ steps.ver.outputs.version }}" --tag ${{ github.ref_name }} -o artifacts/releases
@@ -79,4 +84,6 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           body_path: notes.md
-          files: artifacts/KOALIX-*-portable-win-x64.exe
+          files: |
+            artifacts/KOALIX-*-portable-win-x64.exe
+            artifacts/KOALIX-*-source.zip

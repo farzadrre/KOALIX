@@ -36,7 +36,11 @@ public static class AppHost
         s.AddSingleton(new RingSink(5000));
         s.AddSingleton<Serilog.ILogger>(sp => KoalixLog.Create(paths, sp.GetRequiredService<RingSink>(), sp.GetRequiredService<SettingsRepository>().Get("log.verbose") == "1"));
         s.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(60) });
-        s.AddSingleton(new EnginePaths(paths.Root));
+        // v0.4.47.1: the manual sing-box path setting feeds the resolver (FindSingBoxExe) on this singleton.
+        s.AddSingleton(sp => new EnginePaths(paths.Root)
+        {
+            SingBoxPathOverride = sp.GetRequiredService<SettingsRepository>().Get("engine.singbox.path")
+        });
         s.AddSingleton(sp => new EngineManager(sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<EnginePaths>().EnginesDir));
         s.AddSingleton<WindowsDnsConfigurator>();
         s.AddSingleton<DnsQueryClient>();
@@ -56,6 +60,16 @@ public static class AppHost
         {
             var ep = sp.GetRequiredService<EnginePaths>(); var settings = sp.GetRequiredService<SettingsRepository>();
             var runner = sp.GetRequiredService<IProcessRunner>();
+            var protector = sp.GetRequiredService<ISecretProtector>();
+            // v0.4.47 — the chain (config combination) settings; the WARP private key is a credential and is stored
+            // DPAPI-protected, so it is decrypted here and never lands raw in a config file that survives the run.
+            string? Unprotected(string key)
+            {
+                var v = settings.Get(key);
+                if (v is null) return null;
+                try { return protector.Unprotect(v); }
+                catch { return v.StartsWith("dpapi:", StringComparison.Ordinal) ? null : v; }
+            }
             T Configure<T>(T e) where T : SingBoxEngine
             {
                 e.RemoteDns = settings.Get("tunnel.remoteDns") ?? "1.1.1.1";
@@ -78,6 +92,7 @@ public static class AppHost
                 e.TunMtu = int.TryParse(settings.Get("tun.mtu"), out var tunMtu) ? tunMtu : 9000;
                 e.FragmentEnabled = settings.Get("net.fragment") != "0";
                 e.MuxEnabled = settings.Get("net.mux") == "1";
+                e.Chain = Koalix.SingBox.ChainOptions.FromSettings(Unprotected); // v0.4.47 — chain (WARP/Psiphon combination)
                 WireGuardEngine.PreferOfficial = settings.Get("wireguard.official") == "1";
                 WireGuardEngine.UseWireSock = settings.Get("wireguard.wiresock") is { } ws ? ws == "1" : EnginePaths.WireSockExe is not null;
                 WireGuardEngine.MtuOverride = WireGuardEngine.ParseMtu(settings.Get("wireguard.mtu"));
@@ -102,7 +117,9 @@ public static class AppHost
         s.AddSingleton<WidgetService>(); // v0.4.38 floating mini widget
         s.AddSingleton<UpdateService>();
         s.AddSingleton<BackupService>();
-
+        // v0.4.48 — the Aether section: engine manager (resolve/download aether.exe) + the running-session service.
+        s.AddSingleton(sp => new Koalix.Aether.AetherEngineManager(sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<EnginePaths>()));
+        s.AddSingleton<Koalix.Aether.AetherService>();
         s.AddSingleton<ViewModels.MainViewModel>();
         s.AddSingleton<ViewModels.DashboardViewModel>();
         s.AddSingleton<ViewModels.DnsViewModel>();
@@ -127,6 +144,30 @@ public static class AppHost
         {
             Get<SettingsRepository>().Set("tun.strict", "1");
             Get<SettingsRepository>().Set("tun.strict.migrated", "1");
+        }
+        // v0.4.48 — undo a system proxy a crashed previous run left pointing at the dead Aether HTTP port.
+        try { Get<Koalix.Aether.AetherService>().RestoreStaleProxy(); } catch { }
+        // v0.4.49 — the Aether split session reads the SAME تونل‌زنی state the dashboard connects with: policy
+        // from the settings/rule repository, plus the aether.exe path so the engine's own sockets stay direct
+        // (routing loop guard, same contract as Xray's AlwaysDirectFor).
+        try
+        {
+            var dash = Get<ViewModels.DashboardViewModel>();
+            var aetherSvc = Get<Koalix.Aether.AetherService>();
+            aetherSvc.PolicySource = () => (dash.CurrentPolicy(),
+                aetherSvc.FindEngine() is { } ae ? [ae] : Array.Empty<string>() as IReadOnlyList<string>);
+        }
+        catch { }
+        // v0.4.48 — one-time migration for the WARP chain endpoint: installs that ran the poisoned-DNS era stored
+        // "engage.cloudflareclient.com" (or nothing) as chain.warp.host; both become the IP literal so the chain
+        // works on ISPs that NXDOMAIN the name (field log koalix-20261116). A user who later sets their own value
+        // keeps it — this only rewrites the known-bad legacy values, exactly once.
+        if (Get<SettingsRepository>().Get("chain.warp.endpoint.migrated") is null)
+        {
+            var host = Get<SettingsRepository>().Get("chain.warp.host");
+            if (host is null || host.Trim() == "engage.cloudflareclient.com")
+                Get<SettingsRepository>().Set("chain.warp.host", Koalix.SingBox.WarpIdentity.DefaultEndpointHost);
+            Get<SettingsRepository>().Set("chain.warp.endpoint.migrated", "1");
         }
         // v0.4.31 — stamp the app version into every engine log: a field log now names its own build
         // (log 355 cost hours because nothing in it said "pre-0.4.30").

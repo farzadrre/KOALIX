@@ -81,6 +81,16 @@ public sealed partial class DashboardViewModel : PageViewModel
     private readonly NetworkStateJournal _journal;
     private readonly GeoLookup _geo;
     private readonly SubscriptionRepository _subsRepo;
+    /// <summary>v0.4.47 — chain (config combination) support: WARP registration/identity storage + the combo export.</summary>
+    private readonly EnginePaths _enginePaths;
+    private readonly ISecretProtector _protector;
+    private readonly HttpClient _http;
+    /// <summary>v0.4.48 — the Aether section (port of Aether-GUI's tunnel): engine manager + running session service.</summary>
+    private readonly Koalix.Aether.AetherService _aether;
+    /// <summary>Guards the chain observables while KOALIX itself syncs their state from settings.</summary>
+    private bool _syncChain;
+    /// <summary>Guards the Aether observables while KOALIX itself syncs their state from settings.</summary>
+    private bool _syncAether;
     private CancellationTokenSource? _trafficCts;
     private CancellationTokenSource? _pingCts;
     private CancellationTokenSource? _perAppCts;
@@ -213,10 +223,12 @@ public sealed partial class DashboardViewModel : PageViewModel
 
     public DashboardViewModel(ConnectionManager cm, TunnelProfileRepository profiles, AppRuleRepository rules, SettingsRepository settings,
         HistoryRepository history, UsageRepository usage, HealthChecker health, NetworkStateJournal journal, SystemProxyManager proxy, GamingOptimizer gaming, GeoLookup geo,
-        SubscriptionRepository subsRepo)
+        SubscriptionRepository subsRepo, EnginePaths enginePaths, ISecretProtector protector, HttpClient http,
+        Koalix.Aether.AetherService aether)
     {
         _cm = cm; _profiles = profiles; _rules = rules; _settings = settings; _history = history; _usage = usage; _health = health;
-        _journal = journal; _proxy = proxy; _gaming = gaming; _geo = geo; _subsRepo = subsRepo;
+        _journal = journal; _proxy = proxy; _gaming = gaming; _geo = geo; _subsRepo = subsRepo; _enginePaths = enginePaths; _protector = protector; _http = http;
+        _aether = aether;
         HasRecovery = journal.Pending().Count > 0;
         cm.StateMachine.Changed += c => Ui(() => OnState(c));
         cm.ConflictsDetected += list => Ui(() => { Conflicts.Clear(); foreach (var x in list) Conflicts.Add(L[x.Code] + " — " + x.Detail); });
@@ -254,10 +266,24 @@ public sealed partial class DashboardViewModel : PageViewModel
         };
         System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += (_, _) => Ui(CheckForeignVpn);
         L.LanguageChanged += UpdateHero;
-        L.LanguageChanged += () => Ui(RefreshAutoTexts);
+        L.LanguageChanged += () => Ui(() => { RefreshAutoTexts(); ChainWarpStatus = BuildWarpStatus(); OnPropertyChanged(nameof(ChainModeHint)); });
         L.LanguageChanged += () => Ui(BuildCountryMap);
         L.LanguageChanged += () => _ = LoadUsageCardAsync(); // the usage card is fully localized (v0.4.15)
         _failoverTimer.Tick += (_, _) => _ = AutoFailoverAsync(false);
+        // v0.4.47 — chain card state: read from settings once; every user change writes straight back.
+        _syncChain = true;
+        ChainEnabled = settings.Get("chain.enabled") == "1";
+        ChainModeIndex = ChainOptions.ParseMode(settings.Get("chain.mode")) switch
+        {
+            ChainMode.WarpExit => 1, ChainMode.WarpOverProxy => 2, ChainMode.Psiphon => 3, ChainMode.Aether => 4, _ => 0,
+        };
+        ChainPsiphonPort = settings.Get("chain.psiphon.port") is { Length: > 0 } cp ? cp : "1080";
+        ChainAetherPort = settings.Get("chain.aether.port") is { Length: > 0 } ap ? ap : "1819";
+        ChainWarpStatus = BuildWarpStatus();
+        _syncChain = false;
+        InitAether(); // v0.4.48 — the Aether card observables + engine state stream
+        // v0.4.48.2 — advanced-tunnels card: last chosen tab, panel starts folded (clean dashboard).
+        TunnelsTabIsAether = settings.Get("ui.tunnels.tab") == "aether";
         _syncQuick = true;
         _quickKillSwitch = settings.Get("conn.killSwitch") == "1";
         _quickIranDirect = settings.Get("route.iranDirect") == "1";
@@ -352,6 +378,7 @@ public sealed partial class DashboardViewModel : PageViewModel
     {
         foreach (var r in Profiles) r.IsSelected = r == value;
         SyncCountryStates();
+        OnPropertyChanged(nameof(ChainApplicable)); // v0.4.47 — chain only applies to sing-box/Xray profiles
         UpdateHero();
     }
 
@@ -900,6 +927,16 @@ public sealed partial class DashboardViewModel : PageViewModel
             AutoReconnect = _settings.Get("conn.autoReconnect") != "0",
             KillSwitch = _settings.Get("conn.killSwitch") == "1",
         };
+        // v0.4.49 — chain mode AETHER: the chain config dials the Aether section's SOCKS5 as the exit, but
+        // nothing guaranteed the engine was actually RUNNING (field log: connect fell through to the health
+        // check with 1819 dead). Start it here — the download path reports progress through the status line.
+        if (CurrentChain() is { Enabled: true, Mode: Koalix.SingBox.ChainMode.Aether } && _aether is not { IsConnected: true })
+        {
+            try { await _aether.ConnectAsync(null, CancellationToken.None); }
+            catch (InvalidOperationException ex) when (ex.Message.StartsWith("Aether.Error.", StringComparison.Ordinal))
+            { StatusMessage = L[Redactor.Redact(ex.Message)]; return; }
+            catch (Exception ex) { StatusMessage = Redactor.Redact(ex.Message); return; }
+        }
         _lastTriedId = profile.Id;
         _autoStableSince = DateTimeOffset.Now;
         _historyId = _history.Start(profile.Name, profile.Engine);
@@ -1111,6 +1148,354 @@ public sealed partial class DashboardViewModel : PageViewModel
             _syncQuick = true; QuickSystemProxy = !on; _syncQuick = false;
             StatusMessage = Redactor.Redact(ex.Message);
         }
+    }
+
+    /* ─────────── Chain — config combination (v0.4.47) ─────────── */
+
+    /* ─────────── Advanced-tunnels tabs (v0.4.48.2) ───────────
+       User: «بخش warp و aether رو از داشبورد جدا کن ... یه حالت تب‌طور بذاری و فلش داشته باشه، بزنی روش باز شه
+       که شلوغ نشه». One slim card on the dashboard; the tab strip opens the chain or Aether panel, the close
+       button folds it away again. Choice of tab persists as ui.tunnels.tab; panel starts CLOSED (clean dashboard). */
+
+    [ObservableProperty] private bool _tunnelsPanelOpen;
+    /// <summary>Which segmented tab is active: false = WARP chain, true = Aether.</summary>
+    [ObservableProperty] private bool _tunnelsTabIsAether;
+
+    // v0.4.48.4: clicking a tab must OPEN that panel too («میزنم روشون هیچی نمیاد») — the first cut only flipped
+    // the tab flag and nothing ever set TunnelsPanelOpen=true, so the panels could only ever close. WPF detail:
+    // when the group checks a new RadioButton it first UNCHECKS the old one, so the old tab's setter receives
+    // false — without the guard that push-back would re-select the old tab (selection ping-pong). And a re-click
+    // on the already-checked pill fires setter(true) with NO underlying change, so opening lives in the Command,
+    // which ButtonBase raises on EVERY click regardless of checked state.
+    public bool TunnelsTabChain { get => !TunnelsTabIsAether; set { if (!value) return; TunnelsTabIsAether = false; } }
+    public bool TunnelsTabAether { get => TunnelsTabIsAether; set { if (!value) return; TunnelsTabIsAether = true; } }
+    /// <summary>The panel below the tab strip: visible only while the card is open (Visibility binding).</summary>
+    public bool TunnelsTabChainPanel => TunnelsPanelOpen && !TunnelsTabIsAether;
+    public bool TunnelsTabAetherPanel => TunnelsPanelOpen && TunnelsTabIsAether;
+
+    /// <summary>Every pill click opens its panel — even a re-click on the active pill after «بستن», which no
+    /// IsChecked change would report. Setting TunnelsPanelOpen raises the panel flags when it flips; the
+    /// unconditional re-raise covers the generator's no-change skip.</summary>
+    private void OpenTunnelsPanel()
+    {
+        TunnelsPanelOpen = true;          // false→true fires OnTunnelsPanelOpenChanged → flags refresh
+        OnPropertyChanged(nameof(TunnelsTabChainPanel));   // re-raise even when the generator skipped
+        OnPropertyChanged(nameof(TunnelsTabAetherPanel));
+    }
+
+    [RelayCommand] private void TunnelsOpenChain() { TunnelsTabIsAether = false; OpenTunnelsPanel(); }
+    [RelayCommand] private void TunnelsOpenAether() { TunnelsTabIsAether = true; OpenTunnelsPanel(); }
+
+    partial void OnTunnelsTabIsAetherChanged(bool value)
+    {
+        OnPropertyChanged(nameof(TunnelsTabChain));
+        OnPropertyChanged(nameof(TunnelsTabAether));
+        OnPropertyChanged(nameof(TunnelsTabChainPanel));
+        OnPropertyChanged(nameof(TunnelsTabAetherPanel));
+        try { _settings.Set("ui.tunnels.tab", value ? "aether" : "chain"); } catch { }
+    }
+
+    partial void OnTunnelsPanelOpenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(TunnelsTabChainPanel));
+        OnPropertyChanged(nameof(TunnelsTabAetherPanel));
+    }
+
+    /// <summary>Fold the advanced-tunnels card back to its tab strip (the «بستن» button).</summary>
+    [RelayCommand]
+    private void TunnelsClose() => TunnelsPanelOpen = false;
+
+    [ObservableProperty] private bool _chainEnabled;
+    /// <summary>0 = WARP gaming (UDP→WARP, TCP→config), 1 = WARP exit, 2 = WARP over the config, 3 = Psiphon (local SOCKS).</summary>
+    [ObservableProperty] private int _chainModeIndex;
+    [ObservableProperty] private string _chainWarpStatus = "";
+    [ObservableProperty] private string _chainPsiphonPort = "1080";
+    [ObservableProperty] private string _chainAetherPort = "1819";
+    [ObservableProperty] private bool _chainBusy;
+
+    public bool ChainIsWarpMode => ChainModeIndex is 0 or 1 or 2;
+    public bool ChainIsPsiphon => ChainModeIndex == 3;
+    public bool ChainIsAether => ChainModeIndex == 4;
+    /// <summary>The chain rides the sing-box/Xray engines (they front everything through sing-box); WireGuard/OpenVPN profiles ARE the tunnel — nothing to combine.</summary>
+    public bool ChainApplicable => SelectedTunnel?.Engine is null or EngineKind.SingBox or EngineKind.Xray;
+    public bool ChainNotApplicable => !ChainApplicable;
+    public string ChainModeHint => L[ChainModeIndex switch { 1 => "Chain.Hint.Exit", 2 => "Chain.Hint.OverProxy", 3 => "Chain.Hint.Psiphon", 4 => "Chain.Hint.Aether", _ => "Chain.Hint.Gaming" }];
+
+    partial void OnChainModeIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(ChainIsWarpMode));
+        OnPropertyChanged(nameof(ChainIsPsiphon));
+        OnPropertyChanged(nameof(ChainIsAether));
+        OnPropertyChanged(nameof(ChainModeHint));
+        if (_syncChain) return;
+        _settings.Set("chain.mode", ChainOptions.ModeKey(value switch { 1 => ChainMode.WarpExit, 2 => ChainMode.WarpOverProxy, 3 => ChainMode.Psiphon, 4 => ChainMode.Aether, _ => ChainMode.WarpGaming }));
+        if (IsConnected) Toasts.Show(L["Chain.Title"], L["Chain.AppliedNextConnect"], ToastKind.Info);
+    }
+
+    partial void OnChainEnabledChanged(bool value)
+    {
+        if (_syncChain) return;
+        _settings.Set("chain.enabled", value ? "1" : "0");
+        // Same contract as the quick switches: a running tunnel was built without the chain, so be honest about it.
+        if (IsConnected) Toasts.Show(L["Chain.Title"], L["Chain.AppliedNextConnect"], ToastKind.Info);
+    }
+
+    partial void OnChainPsiphonPortChanged(string value)
+    {
+        if (_syncChain) return;
+        if (int.TryParse(value.Trim(), out var p) && p is >= 1 and <= 65535) _settings.Set("chain.psiphon.port", p.ToString());
+    }
+
+    partial void OnChainAetherPortChanged(string value)
+    {
+        if (_syncChain) return;
+        if (int.TryParse(value.Trim(), out var p) && p is >= 1 and <= 65535) _settings.Set("chain.aether.port", p.ToString());
+    }
+
+    // ══════════════ Aether section (v0.4.48) — port of Aether-GUI's full tunnel card ══════════════
+    // Every observable mirrors one aether.* setting; the partial Changed methods write straight back, the
+    // same load-once/persist-on-change contract the chain card uses. The AetherService owns the process.
+
+    [ObservableProperty] private int _aetherProtocolIndex;   // 0 Auto, 1 MASQUE, 2 WireGuard, 3 gool, 4 MiM
+    [ObservableProperty] private int _aetherScanIndex = 1;   // 0 Turbo … 4 Ironclad (default Balanced)
+    [ObservableProperty] private int _aetherIpIndex = 2;     // 0 v4, 1 v6, 2 both
+    [ObservableProperty] private int _aetherNetworkIndex;    // 0 Warp … 6 TorReverse
+    [ObservableProperty] private int _aetherMasqueNoizeIndex;    // 0 firewall, 1 gfw, 2 off
+    [ObservableProperty] private int _aetherWgNoizeIndex;        // 0 balanced, 1 aggressive, 2 light, 3 off
+    [ObservableProperty] private bool _aetherQuickReconnect = true;
+    [ObservableProperty] private bool _aetherMasqueHttp2;
+    [ObservableProperty] private bool _aetherSystemProxy;
+    [ObservableProperty] private string _aetherBind = "127.0.0.1:1819";
+    [ObservableProperty] private string _aetherHttpProxy = "";
+    [ObservableProperty] private string _aetherUpstream = "";
+    [ObservableProperty] private string _aetherExitLoc = "";
+    [ObservableProperty] private string _aetherZtTeam = "";
+    [ObservableProperty] private int _aetherZtAuthIndex;
+    [ObservableProperty] private string _aetherZtEmail = "";
+    [ObservableProperty] private string _aetherZtClientId = "";
+    [ObservableProperty] private string _aetherZtSecret = "";
+    [ObservableProperty] private string _aetherZtToken = "";
+    [ObservableProperty] private bool _aetherZtGateway;
+    [ObservableProperty] private bool _aetherBusy;
+    [ObservableProperty] private string _aetherStateText = "";
+
+    public string AetherButtonText => L[_aether is { IsConnected: true } ? "Aether.Disconnect" : "Aether.Connect"];
+
+    /// <summary>Loads the aether.* settings into the observables once, and wires the engine's state stream.</summary>
+    private void InitAether()
+    {
+        _syncAether = true;
+        AetherProtocolIndex = _settings.Get("aether.protocol") switch { "Masque" => 1, "Wireguard" => 2, "Gool" => 3, "Mim" => 4, _ => 0 };
+        AetherScanIndex = _settings.Get("aether.scan") switch { "Turbo" => 0, "Thorough" => 2, "Verified" => 3, "Ironclad" => 4, _ => 1 };
+        AetherIpIndex = _settings.Get("aether.ip") switch { "V4" => 0, "V6" => 1, _ => 2 };
+        AetherNetworkIndex = _settings.Get("aether.network") switch
+        { "PsiphonOnly" => 1, "TorOnly" => 2, "PsiphonChain" => 3, "TorChain" => 4, "PsiphonReverse" => 5, "TorReverse" => 6, _ => 0 };
+        AetherMasqueNoizeIndex = _settings.Get("aether.masqueNoize") switch { "Gfw" => 1, "Off" => 2, _ => 0 };
+        AetherWgNoizeIndex = _settings.Get("aether.wgNoize") switch { "Aggressive" => 1, "Light" => 2, "Off" => 3, _ => 0 };
+        AetherQuickReconnect = _settings.Get("aether.quickReconnect") != "0";
+        AetherMasqueHttp2 = _settings.Get("aether.masqueHttp2") == "1";
+        AetherSystemProxy = _settings.Get("aether.systemProxy") == "1";
+        AetherBind = _settings.Get("aether.bind") ?? "127.0.0.1:1819";
+        AetherHttpProxy = _settings.Get("aether.httpProxy") ?? "";
+        AetherUpstream = _settings.Get("aether.upstream") ?? "";
+        AetherExitLoc = _settings.Get("aether.exitLoc") ?? "";
+        AetherZtTeam = _settings.Get("aether.zt.team") ?? "";
+        AetherZtAuthIndex = _settings.Get("aether.zt.auth") switch { "Service" => 1, "Token" => 2, _ => 0 };
+        AetherZtEmail = _settings.Get("aether.zt.email") ?? "";
+        AetherZtClientId = _settings.Get("aether.zt.clientId") ?? "";
+        AetherZtSecret = _settings.Get("aether.zt.secret") ?? "";
+        AetherZtToken = _settings.Get("aether.zt.token") ?? "";
+        AetherZtGateway = _settings.Get("aether.zt.gateway") == "1";
+        _syncAether = false;
+        RefreshAetherState();
+        _aether.OnState += (_, _) => Ui(RefreshAetherState);
+        L.LanguageChanged += () => Ui(RefreshAetherState);
+    }
+
+    /// <summary>The card's state line: engine presence + lifecycle state + the SOCKS address to point apps at.</summary>
+    private void RefreshAetherState()
+    {
+        var state = _aether.Engine.State;
+        var engine = _aether.FindEngine() is null ? "✗ " + L["Aether.EngineMissing"] : "✓ " + L["Aether.EngineReady"];
+        var st = state switch
+        {
+            Koalix.Aether.AetherState.Launching => L["Aether.State.Launching"],
+            Koalix.Aether.AetherState.Connecting => L["Aether.State.Connecting"],
+            Koalix.Aether.AetherState.Connected => L["Aether.State.Connected"],
+            Koalix.Aether.AetherState.Reconnecting => L["Aether.State.Reconnecting"],
+            Koalix.Aether.AetherState.Failed => L["Aether.State.Failed"],
+            Koalix.Aether.AetherState.Disconnecting => L["Aether.State.Disconnecting"],
+            _ => L["Aether.State.Idle"],
+        };
+        AetherStateText = state == Koalix.Aether.AetherState.Connected
+            ? $"Aether · {st} · SOCKS5 {_aether.PrimaryAddr}"
+            : $"Aether · {st} · {engine}";
+        OnPropertyChanged(nameof(AetherButtonText));
+    }
+
+    [RelayCommand]
+    private async Task AetherToggleAsync()
+    {
+        if (AetherBusy) return;
+        AetherBusy = true;
+        try
+        {
+            if (_aether is { IsConnected: true } or { Engine.State: Koalix.Aether.AetherState.Launching or Koalix.Aether.AetherState.Connecting or Koalix.Aether.AetherState.Reconnecting })
+                await _aether.DisconnectAsync();
+            else
+                await _aether.ConnectAsync(null, CancellationToken.None);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("Aether.Error.", StringComparison.Ordinal))
+        {
+            var msg = L[Redactor.Redact(ex.Message)]; // indexer handles "Aether.Error.PortInUse:1819" codes with args
+            Toasts.Show(L["Aether.Title"], msg, ToastKind.Error);
+            AppHost.Log(LogCategory.Application, "aether: " + Redactor.Redact(ex.Message), Serilog.Events.LogEventLevel.Warning);
+        }
+        catch (Exception ex)
+        {
+            Toasts.Show(L["Aether.Title"], Redactor.Redact(ex.Message), ToastKind.Error);
+        }
+        finally { AetherBusy = false; RefreshAetherState(); }
+    }
+
+    [RelayCommand] private void AetherGamingPreset() { _aether.ApplyGamingPreset(); InitAether(); Toasts.Show(L["Aether.Title"], L["Aether.Preset.Gaming.Done"], ToastKind.Success); }
+    [RelayCommand] private void AetherStealthPreset() { _aether.ApplyStealthPreset(); InitAether(); Toasts.Show(L["Aether.Title"], L["Aether.Preset.Stealth.Done"], ToastKind.Success); }
+    [RelayCommand] private void AetherDefaultPreset() { _aether.ApplyDefaultPreset(); InitAether(); Toasts.Show(L["Aether.Title"], L["Aether.Preset.Default.Done"], ToastKind.Success); }
+
+    // settings write-backs (guarded, like the chain card)
+    partial void OnAetherProtocolIndexChanged(int value) { if (!_syncAether) _settings.Set("aether.protocol", value switch { 1 => "Masque", 2 => "Wireguard", 3 => "Gool", 4 => "Mim", _ => "Auto" }); }
+    partial void OnAetherScanIndexChanged(int value) { if (!_syncAether) _settings.Set("aether.scan", value switch { 0 => "Turbo", 2 => "Thorough", 3 => "Verified", 4 => "Ironclad", _ => "Balanced" }); }
+    partial void OnAetherIpIndexChanged(int value) { if (!_syncAether) _settings.Set("aether.ip", value switch { 0 => "V4", 1 => "V6", _ => "Both" }); }
+    partial void OnAetherNetworkIndexChanged(int value)
+    {
+        if (_syncAether) return;
+        _settings.Set("aether.network", value switch { 1 => "PsiphonOnly", 2 => "TorOnly", 3 => "PsiphonChain", 4 => "TorChain", 5 => "PsiphonReverse", 6 => "TorReverse", _ => "Warp" });
+    }
+    partial void OnAetherMasqueNoizeIndexChanged(int value) { if (!_syncAether) _settings.Set("aether.masqueNoize", value switch { 1 => "Gfw", 2 => "Off", _ => "Firewall" }); }
+    partial void OnAetherWgNoizeIndexChanged(int value) { if (!_syncAether) _settings.Set("aether.wgNoize", value switch { 1 => "Aggressive", 2 => "Light", 3 => "Off", _ => "Balanced" }); }
+    partial void OnAetherQuickReconnectChanged(bool value) { if (!_syncAether) _settings.Set("aether.quickReconnect", value ? "1" : "0"); }
+    partial void OnAetherMasqueHttp2Changed(bool value) { if (!_syncAether) _settings.Set("aether.masqueHttp2", value ? "1" : "0"); }
+    partial void OnAetherBindChanged(string value) { if (!_syncAether && System.Net.IPEndPoint.TryParse(value.Trim(), out _)) _settings.Set("aether.bind", value.Trim()); }
+    partial void OnAetherHttpProxyChanged(string value) { if (!_syncAether) _settings.Set("aether.httpProxy", value.Trim()); }
+    partial void OnAetherUpstreamChanged(string value) { if (!_syncAether) _settings.Set("aether.upstream", value.Trim()); }
+    partial void OnAetherExitLocChanged(string value) { if (!_syncAether) _settings.Set("aether.exitLoc", value.Trim()); }
+    partial void OnAetherZtTeamChanged(string value) { if (!_syncAether) _settings.Set("aether.zt.team", value.Trim()); }
+    partial void OnAetherZtAuthIndexChanged(int value) { if (!_syncAether) _settings.Set("aether.zt.auth", value switch { 1 => "Service", 2 => "Token", _ => "Email" }); }
+    partial void OnAetherZtEmailChanged(string value) { if (!_syncAether) _settings.Set("aether.zt.email", value.Trim()); }
+    partial void OnAetherZtClientIdChanged(string value) { if (!_syncAether) _settings.Set("aether.zt.clientId", value.Trim()); }
+    partial void OnAetherZtSecretChanged(string value) { if (!_syncAether) _settings.Set("aether.zt.secret", value.Trim()); }
+    partial void OnAetherZtTokenChanged(string value) { if (!_syncAether) _settings.Set("aether.zt.token", value.Trim()); }
+    partial void OnAetherZtGatewayChanged(bool value) { if (!_syncAether) _settings.Set("aether.zt.gateway", value ? "1" : "0"); }
+
+    /// <summary>Reads the chain options as the engines will see them on the NEXT connect (identity decrypted here).</summary>
+    private ChainOptions CurrentChain() => ChainOptions.FromSettings(UnprotectedSetting);
+
+    partial void OnAetherSystemProxyChanged(bool value)
+    {
+        if (_syncAether) return;
+        _settings.Set("aether.systemProxy", value ? "1" : "0");
+        // v0.4.49 — toggling while connected applies IMMEDIATELY (the old flow needed a full reconnect):
+        // ON starts the split-aware TUN session, OFF stops it. The engine itself keeps running either way.
+        if (_aether is { IsConnected: true })
+        {
+            if (value) _ = _aether.StartSplitSessionAsync();
+            else _ = _aether.StopSplitSessionAsync();
+        }
+    }
+
+    private string? UnprotectedSetting(string key)
+    {
+        var v = _settings.Get(key);
+        if (v is null) return null;
+        try { return _protector.Unprotect(v); }
+        catch { return v.StartsWith("dpapi:", StringComparison.Ordinal) ? null : v; }
+    }
+
+    private void SaveWarpIdentity(WarpIdentity w)
+    {
+        _settings.Set("chain.warp.priv", _protector.Protect(w.PrivateKey));
+        _settings.Set("chain.warp.peer", w.PeerPublicKey);
+        _settings.Set("chain.warp.v4", w.AddressV4);
+        _settings.Set("chain.warp.v6", w.AddressV6 ?? "");
+        _settings.Set("chain.warp.reserved", w.Reserved is { Count: 3 } r ? string.Join(',', r) : "");
+        _settings.Set("chain.warp.host", w.EndpointHost);
+        _settings.Set("chain.warp.port", w.EndpointPort.ToString());
+        ChainWarpStatus = BuildWarpStatus();
+    }
+
+    private string BuildWarpStatus() =>
+        CurrentChain().Warp is not { } w ? L["Chain.Warp.StatusMissing"]
+        : L.Format("Chain.Warp.StatusOk", w.AddressV4, w.Reserved is { Count: 3 } ? "✓" : "✗");
+
+    /// <summary>Registers a brand-new free WARP identity with Cloudflare (keypair from the installed sing-box CLI, then
+    /// the same registration call wgcf/BPB use). Requires the sing-box engine to be installed.</summary>
+    [RelayCommand]
+    private async Task CreateWarpIdentityAsync()
+    {
+        if (ChainBusy) return;
+        ChainBusy = true;
+        try
+        {
+            var sbExe = _enginePaths.FindSingBoxExe(); // v0.4.47.1: manual path → own engines folder → PATH → common installs
+            if (sbExe is null)
+            {
+                AppHost.Log(LogCategory.Application, $"chain: sing-box not found for WARP keygen (searched override, {_enginePaths.SingBoxExe}, PATH, common install dirs)");
+                throw new InvalidOperationException("Engine.Error.SingBoxMissing");
+            }
+            AppHost.Log(LogCategory.Application, $"chain: WARP keygen with sing-box at {sbExe}");
+            var w = await WarpIdentity.RegisterAsync(sbExe, _http, CancellationToken.None, m => AppHost.Log(LogCategory.Application, m));
+            SaveWarpIdentity(w);
+            Toasts.Show(L["Chain.Title"], L["Chain.Warp.Created"], ToastKind.Success);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            // Loc's indexer resolves "Key" and "Key:arg" codes natively and passes anything else through as-is.
+            Toasts.Show(L["Chain.Title"], L[Redactor.Redact(ex.Message)], ToastKind.Error);
+        }
+        finally { ChainBusy = false; }
+    }
+
+    /// <summary>Imports an existing WARP identity: a sing-box wireguard outbound/endpoint JSON (BPB "Warp" configs emit
+    /// exactly that) or a plain WireGuard .conf. .conf files carry no reserved bytes — warn honestly.</summary>
+    [RelayCommand]
+    private async Task ImportWarpIdentityAsync()
+    {
+        if (ChainBusy) return;
+        var path = Services.Dialogs.OpenFile("Config|*.json;*.conf;*.txt|All files|*.*");
+        if (path is null) return;
+        ChainBusy = true;
+        try
+        {
+            var w = WarpIdentity.TryParse(await File.ReadAllTextAsync(path), out var err);
+            if (w is null) { Toasts.Show(L["Chain.Title"], L[err!], ToastKind.Error); return; }
+            SaveWarpIdentity(w);
+            if (w.Reserved is { Count: 3 }) Toasts.Show(L["Chain.Title"], L["Chain.Warp.Imported"], ToastKind.Success);
+            else Toasts.Show(L["Chain.Title"], L["Chain.Warn.NoReserved"], ToastKind.Warning);
+        }
+        catch (Exception ex) { Toasts.Show(L["Chain.Title"], Redactor.Redact(ex.Message), ToastKind.Error); }
+        finally { ChainBusy = false; }
+    }
+
+    /// <summary>Exports the selected profile + chain as ONE standalone sing-box JSON — the combo for sing-box/Hiddify/
+    /// NekoBox on the phone, so gaming-over-worker works there without KOALIX.</summary>
+    [RelayCommand]
+    private async Task ExportChainConfigAsync()
+    {
+        if (SelectedTunnel is not { } profile) { Toasts.Show(L["Chain.Title"], L["Dash.NoProfile"], ToastKind.Warning); return; }
+        try
+        {
+            var opts = CurrentChain() with { Enabled = true, Mode = ChainModeIndex switch { 1 => ChainMode.WarpExit, 2 => ChainMode.WarpOverProxy, 3 => ChainMode.Psiphon, _ => ChainMode.WarpGaming } };
+            if (opts.NeedsWarp && opts.Warp is null) { Toasts.Show(L["Chain.Title"], L["Chain.Error.NoWarp"], ToastKind.Warning); return; }
+            var cfg = ChainConfig.BuildStandalone(profile, opts, out var err);
+            if (cfg is null) { Toasts.Show(L["Chain.Title"], L[err!], ToastKind.Error); return; }
+            var path = Services.Dialogs.SaveFile("sing-box JSON|*.json", $"koalix-combo-{DateTime.Now:yyyyMMdd-HHmm}.json");
+            if (path is null) return;
+            await File.WriteAllTextAsync(path, SingBoxConfigBuilder.ToJson(cfg));
+            AppHost.Log(LogCategory.Application, $"Chain combo exported: {profile.Name} ({ChainOptions.ModeKey(opts.Mode)}) → {path}");
+            Toasts.Show(L["Chain.Title"], L["Chain.Export.Done"], ToastKind.Success);
+        }
+        catch (Exception ex) { Toasts.Show(L["Chain.Title"], Redactor.Redact(ex.Message), ToastKind.Error); }
     }
 
     private void StartTraffic()
