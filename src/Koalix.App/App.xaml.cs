@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading;
 using System.Windows;
 using Koalix.App.Localization;
@@ -64,6 +65,8 @@ public partial class App : Application
             Loc.I.LanguageChanged += () => { try { ThemeService.ApplyFont(Loc.I.Language); } catch { } };
             Controls.Fx.Enabled = !safe && settings.Get("ui.effects") != "0";
             Controls.LiveBackdrop.Allowed = settings.Get(Controls.LiveBackdrop.SettingKey) != "0";
+            Controls.LiveBackdrop.PushKind(settings.Get("ui.bgKind") ?? "particles"); // v0.4.52 — the picked animated background
+            ApplyFactoryDefaults(settings); // v0.4.52 — first-run defaults from the reference backup (settings only, sanitized)
             SoundService.Load(settings); // v0.4.23: the connect/disconnect/error tones honour "ui.sounds"
             Controls.ThemeRefresh.Install(); // v0.4.42: hand-drawn controls repaint on every theme/palette change
             Controls.Motion.Install();       // v0.4.43: right-click menus and tooltips open with a soft scale + fade
@@ -92,6 +95,7 @@ public partial class App : Application
             {
                 window.Show();
                 window.Activate();
+                ShowWhatsNewOnce(settings); // v0.4.52 — «وقتی اولین بار اپدیت میکنیم اپو بیاد رو تصویر و ببینیم چیه»
             }
             StartupLog.WindowShown = true;
             StartupLog.Trace("main window shown");
@@ -157,9 +161,54 @@ public partial class App : Application
         }
     }
 
+    /// <summary>v0.4.52 — «فایل بکاپ پیشفرض میخوام این باشه فقط بخش تنظیماتش ها»: the sanitized SETTINGS of the
+    /// user's reference backup ship as factory defaults (Defaults/FactorySettings.json) and seed a FRESH install
+    /// exactly once — only into keys that have no value yet, never overwriting anything already set. Personal
+    /// data (WARP identity, game paths, widget placement, onboarding flags) was stripped at build time.</summary>
+    private static void ApplyFactoryDefaults(SettingsRepository settings)
+    {
+        try
+        {
+            if (settings.Get("app.factoryApplied") == "1") return;
+            using var s = typeof(App).Assembly.GetManifestResourceStream("Koalix.App.Defaults.FactorySettings.json");
+            if (s is not null)
+            {
+                using var doc = JsonDocument.Parse(s);
+                foreach (var prop in doc.RootElement.GetProperty("defaults").EnumerateObject())
+                {
+                    if (prop.Value.ValueKind != JsonValueKind.String) continue;
+                    if (string.IsNullOrEmpty(settings.Get(prop.Name))) settings.Set(prop.Name, prop.Value.GetString()!);
+                }
+            }
+            settings.Set("app.factoryApplied", "1");
+            StartupLog.Trace("factory defaults applied");
+        }
+        catch (Exception ex) { StartupLog.Trace("factory defaults: " + ex.Message); }
+    }
+
+    /// <summary>v0.4.52 — the first launch after an UPDATE pops the newest version's notes (WhatsNewWindow),
+    /// exactly once per version (app.seenVersion). A fresh install skips it — the starter tour covers that.</summary>
+    private static void ShowWhatsNewOnce(SettingsRepository settings)
+    {
+        try
+        {
+            var v = typeof(App).Assembly.GetName().Version!;
+            var ver = $"{v.Major}.{v.Minor}.{v.Build}";
+            var seen = settings.Get("app.seenVersion");
+            if (seen == ver) return;
+            if (seen is null && settings.Get("ui.onboarded") != "1") { settings.Set("app.seenVersion", ver); return; }
+            var notes = Controls.WhatsNewWindow.LoadNotes(ver, Loc.I.Language);
+            settings.Set("app.seenVersion", ver);
+            if (notes is not { Count: > 0 }) return;
+            Application.Current?.Dispatcher.BeginInvoke(new Action(() => { try { new Controls.WhatsNewWindow(ver, notes).ShowDialog(); } catch { } }));
+        }
+        catch (Exception ex) { try { StartupLog.Trace("whats-new: " + ex.Message); } catch { } }
+    }
+
     private static void ShowMain(Window window)
     {
         window.Show();
+        try { ShowWhatsNewOnce(AppHost.Get<SettingsRepository>()); } catch { } // v0.4.52 — also when opened from the tray
         if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
         window.Activate();
     }

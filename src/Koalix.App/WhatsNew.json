@@ -1,0 +1,20 @@
+{
+  "0.4.52": {
+    "fa": [
+      "منو دستِ شما شد: «ویرایش منو» واقعاً کار می‌کند — با کشیدن جابه‌جا کنید، با ✕ مخفی کنید؛ ترتیب ذخیره می‌شود",
+      "«تونل‌های پیشرفته» حالا «مدارها»ست؛ لوگوی جدید متحرک برای مدارها و لوگوی اختصاصی اتمی برای اتر",
+      "پشتیبان‌گیری انتخابی شد: خودتان انتخاب می‌کنید چه چیزی در فایل ذخیره شود؛ لاگ‌ها هرگز ذخیره نمی‌شوند",
+      "پیام «ذخیره شد» از بالای صفحه حذف شد و داخل تب بکاپ می‌نشیند؛ کادر بکاپ هم از نو طراحی شد",
+      "پس‌زمینه‌های متحرک قابل انتخاب: صورت فلکی، مدارهای چرخان، شهاب‌ها + ذرات و موج همیشگی",
+      "رفع تصویر دوتایی بعد از تعویض تم یا رنگ؛ گزینه‌های صفحهٔ مدارها کوچک‌تر و مرتب‌تر شدند"
+    ],
+    "en": [
+      "Your menu, your rules: Edit menu now really works — drag to reorder, ✕ to hide; the order is saved",
+      "Advanced tunnels are now «Circuits»; a new animated circuit logo plus a dedicated atom logo for Aether",
+      "Selective backups: you choose what goes into the file; logs are never included",
+      "The «saved» message moved from the top banner into the backup tab; the backup card was redesigned",
+      "Selectable animated backgrounds: Constellation, Orbits, Meteors + the classic particles & waves",
+      "Fixed the double image after theme/accent switches; the Circuits options are smaller and tidier"
+    ]
+  }
+}

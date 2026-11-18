@@ -166,12 +166,18 @@ public sealed class MotionGlyph : ContentControl
             Storyboard? sb = null;
             switch (Key ?? "")
             {
-                case "Nav.Split": (canvas, sb) = SplitIcon(w, h); break;
+                // v0.4.54 — «روی مدیریت تونل ها میزنم میره توی مدار ها باید بره توی تونل های انتخابی»: the nav
+                // rows swapped VMs, so the icons swap with them — the «مدارها» row (key Nav.Split) draws the
+                // circuit, the «تونل‌های انتخابی» row (key Nav.TunnelHub) draws the arrows.
+                case "Nav.Split": (canvas, sb) = CircuitIcon(w, h); break;
+                case "Circuit": (canvas, sb) = CircuitIcon(w, h); break;     // v0.4.54 — the hub header logo
+                case "Nav.TunnelHub": (canvas, sb) = SplitIcon(w, h); break; // v0.4.54 — the selective-tunnels row
                 case "Nav.Inspector": (canvas, sb) = InspectorIcon(w, h); break;
                 case "Nav.Ping": (canvas, sb) = PingIcon(w, h); break;
                 case "Nav.Logs": (canvas, sb) = LogsIcon(w, h); break;
                 case "Nav.About": (canvas, sb) = AboutIcon(w, h); break;
                 case "Nav.Gaming": (canvas, sb) = GamingIcon(w, h); break;
+                case "Aether": (canvas, sb) = AetherIcon(w, h); break;        // v0.4.54 — bold shield+bolt (the atom was invisible at 14px)
                 default: Content = null; return; // every other section keeps its font glyph
             }
             Content = canvas;
@@ -258,6 +264,161 @@ public sealed class MotionGlyph : ContentControl
         }
         Packet(w * 0.10, w * 0.62, topY, 1.6, 0.0);
         Packet(w * 0.62, w * 0.10, botY, 1.6, 0.8);
+        return (c, sb);
+    }
+
+    /* ══════ v0.4.52 — «مدارها» (the renamed advanced-tunnels page): a CIRCUIT. Three square pads, two
+       orthogonal traces and a pulse packet that rides the Z-path with synced Left/Top keyframes; the pads
+       breathe. Straight lines + rounded squares only. ══════ */
+
+    private (Canvas, Storyboard) CircuitIcon(double w, double h)
+    {
+        var c = new Canvas();
+        double pad = Math.Max(2.6, h * 0.16);
+
+        // three pads: left mid (origin), top right, bottom right
+        Border Pad(double x, double y)
+        {
+            var b = new Border { Width = pad, Height = pad, CornerRadius = new CornerRadius(pad * 0.3) };
+            b.SetBinding(Border.BackgroundProperty, new Binding(nameof(Foreground)) { Source = this });
+            Canvas.SetLeft(b, x - pad / 2);
+            Canvas.SetTop(b, y - pad / 2);
+            c.Children.Add(b);
+            return b;
+        }
+        var midY = h * 0.5;
+        var origin = Pad(w * 0.10, midY);
+        var top = Pad(w * 0.86, h * 0.18);
+        var bottom = Pad(w * 0.86, h * 0.82);
+
+        // the two traces: origin → centre → top-right, origin → centre → bottom-right
+        c.Children.Add(Stroke(Geo($"M {F(w * 0.10)},{F(midY)} H {F(w * 0.55)} V {F(h * 0.18)} H {F(w * 0.86)}"), 1.6));
+        c.Children.Add(Stroke(Geo($"M {F(w * 0.55)},{F(midY)} V {F(h * 0.82)} H {F(w * 0.86)}"), 1.6));
+
+        // the packet rides the Z-path: left → centre → up → right, with synced Left/Top keyframes
+        var dot = new Border { Width = Math.Max(2.4, w * 0.14), Height = Math.Max(2.4, w * 0.14), CornerRadius = new CornerRadius(1.2), Opacity = 0 };
+        dot.SetBinding(Border.BackgroundProperty, new Binding(nameof(Foreground)) { Source = this });
+        c.Children.Add(dot);
+        var dur = 2.6;
+        var rideL = new DoubleAnimationUsingKeyFrames { BeginTime = TimeSpan.Zero, RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromSeconds(dur) };
+        var rideT = new DoubleAnimationUsingKeyFrames { BeginTime = TimeSpan.Zero, RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromSeconds(dur) };
+        (double l, double t, double s)[] path =
+        {
+            (w * 0.10, midY, 0.0), (w * 0.55, midY, 0.42), (w * 0.55, h * 0.18, 0.62), (w * 0.86, h * 0.18, 1.0),
+        };
+        rideL.KeyFrames.Add(new LinearDoubleKeyFrame(path[0].l, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0))));
+        rideT.KeyFrames.Add(new LinearDoubleKeyFrame(path[0].t, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0))));
+        rideT.KeyFrames.Add(new DiscreteDoubleKeyFrame(path[0].t, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0.01))));
+        foreach (var (l, t, s) in path[1..])
+        {
+            rideL.KeyFrames.Add(new LinearDoubleKeyFrame(l, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(s * dur))));
+            rideT.KeyFrames.Add(new LinearDoubleKeyFrame(t, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(s * dur))));
+        }
+        var sb = new Storyboard { RepeatBehavior = RepeatBehavior.Forever };
+        var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromSeconds(0.2)) { BeginTime = TimeSpan.Zero, RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromSeconds(dur) };
+        var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromSeconds(0.25)) { BeginTime = TimeSpan.FromSeconds(dur - 0.25), RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromSeconds(dur) };
+        Storyboard.SetTarget(rideL, dot); Storyboard.SetTargetProperty(rideL, new PropertyPath("(Canvas.Left)"));
+        Storyboard.SetTarget(rideT, dot); Storyboard.SetTargetProperty(rideT, new PropertyPath("(Canvas.Top)"));
+        Storyboard.SetTarget(fadeIn, dot); Storyboard.SetTargetProperty(fadeIn, new PropertyPath(UIElement.OpacityProperty));
+        Storyboard.SetTarget(fadeOut, dot); Storyboard.SetTargetProperty(fadeOut, new PropertyPath(UIElement.OpacityProperty));
+        sb.Children.Add(rideL); sb.Children.Add(rideT); sb.Children.Add(fadeIn); sb.Children.Add(fadeOut);
+
+        // the pads breathe in turn (origin → top → bottom)
+        var ease = new SineEase { EasingMode = EasingMode.EaseInOut };
+        var pads = new[] { origin, top, bottom };
+        for (var i = 0; i < pads.Length; i++)
+        {
+            var breathe = new DoubleAnimation(0.55, 1, TimeSpan.FromSeconds(0.9))
+            {
+                AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever,
+                BeginTime = TimeSpan.FromSeconds(i * 0.35), EasingFunction = ease,
+            };
+            Storyboard.SetTarget(breathe, pads[i]); Storyboard.SetTargetProperty(breathe, new PropertyPath(UIElement.OpacityProperty));
+            sb.Children.Add(breathe);
+        }
+        return (c, sb);
+    }
+
+    /* ══════ v0.4.52 — «لوگوی اتر هم تکراریه عوضش کن»: Aether finally gets its OWN logo. An atom built from two
+       rounded-square rings tilted against each other with a nucleus, and an electron orbiting inside one ring
+       (the whole electron-canvas rotates — no ovals anywhere, per the absolute no-ovals rule). ══════ */
+
+    /// <summary>v0.4.54 — «لوگوی اتر و عوض کن هیچی معلوم نیست»: the old atom (two hairline ellipses + a speck)
+    /// dissolved at the 14px chip size. The new mark: a THICK shield with a filled lightning bolt inside — the
+    /// anti-censorship tunnel — plus a bolt flicker while the section is alive.</summary>
+    private (Canvas, Storyboard) AetherIcon(double w, double h)
+    {
+        var c = new Canvas();
+        var t = Math.Max(1.6, w * 0.115); // the shield's thick stroke
+        // shield: rounded top shoulders, tapering to a point at the bottom
+        var shield = Geo($"M {F(w * 0.5)},{F(h * 0.07)} C {F(w * 0.70)},{F(h * 0.13)} {F(w * 0.86)},{F(h * 0.16)} {F(w * 0.86)},{F(h * 0.30)} L {F(w * 0.86)},{F(h * 0.55)} C {F(w * 0.86)},{F(h * 0.76)} {F(w * 0.70)},{F(h * 0.88)} {F(w * 0.5)},{F(h * 0.95)} C {F(w * 0.30)},{F(h * 0.88)} {F(w * 0.14)},{F(h * 0.76)} {F(w * 0.14)},{F(h * 0.55)} L {F(w * 0.14)},{F(h * 0.30)} C {F(w * 0.14)},{F(h * 0.16)} {F(w * 0.30)},{F(h * 0.13)} {F(w * 0.5)},{F(h * 0.07)} Z");
+        c.Children.Add(Stroke(shield, t));
+        // filled bolt
+        var bolt = Geo($"M {F(w * 0.56)},{F(h * 0.24)} L {F(w * 0.38)},{F(h * 0.54)} L {F(w * 0.50)},{F(h * 0.54)} L {F(w * 0.44)},{F(h * 0.78)} L {F(w * 0.65)},{F(h * 0.46)} L {F(w * 0.52)},{F(h * 0.46)} Z");
+        var boltPath = new Path { Data = bolt };
+        boltPath.SetBinding(Shape.FillProperty, new Binding(nameof(Foreground)) { Source = this });
+        c.Children.Add(boltPath);
+
+        var sb = new Storyboard { RepeatBehavior = RepeatBehavior.Forever };
+        var flicker = new DoubleAnimation(1, 0.55, TimeSpan.FromSeconds(0.9)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } };
+        Storyboard.SetTarget(flicker, boltPath); Storyboard.SetTargetProperty(flicker, new PropertyPath(UIElement.OpacityProperty));
+        sb.Children.Add(flicker);
+        return (c, sb);
+    }
+
+    private (Canvas, Storyboard) AtomIcon(double w, double h)
+    {
+        var c = new Canvas();
+        var ringW = w * 0.74;
+        var ringH = h * 0.42;
+        var stroke = 1.5;
+
+        Border Ring(double angle)
+        {
+            var b = new Border { Width = ringW, Height = ringH, CornerRadius = new CornerRadius(ringH / 2), BorderThickness = new Thickness(stroke) };
+            b.SetBinding(Border.BorderBrushProperty, new Binding(nameof(Foreground)) { Source = this });
+            b.RenderTransform = new RotateTransform(angle);
+            b.RenderTransformOrigin = new Point(0.5, 0.5);
+            Canvas.SetLeft(b, (w - ringW) / 2);
+            Canvas.SetTop(b, (h - ringH) / 2);
+            c.Children.Add(b);
+            return b;
+        }
+        var r1 = Ring(-28);
+        var r2 = Ring(28);
+
+        // nucleus
+        var nucleus = new Border { Width = Math.Max(3, w * 0.17), Height = Math.Max(3, w * 0.17), CornerRadius = new CornerRadius(1.4) };
+        nucleus.SetBinding(Border.BackgroundProperty, new Binding(nameof(Foreground)) { Source = this });
+        Canvas.SetLeft(nucleus, w / 2 - nucleus.Width / 2);
+        Canvas.SetTop(nucleus, h / 2 - nucleus.Height / 2);
+        c.Children.Add(nucleus);
+
+        // the electron: a dot at the ring's edge inside a canvas that rotates around the centre → a circular orbit
+        var orbit = new Canvas { Width = w, Height = h };
+        var electron = new Border { Width = Math.Max(2.2, w * 0.14), Height = Math.Max(2.2, w * 0.14), CornerRadius = new CornerRadius(1.1) };
+        electron.SetBinding(Border.BackgroundProperty, new Binding(nameof(Foreground)) { Source = this });
+        Canvas.SetLeft(electron, w / 2);
+        Canvas.SetTop(electron, (h - ringH) / 2 - electron.Height / 2);
+        orbit.Children.Add(electron);
+        var spin = new RotateTransform();
+        orbit.RenderTransform = spin;
+        orbit.RenderTransformOrigin = new Point(0.5, 0.5);
+        c.Children.Add(orbit);
+
+        var sb = new Storyboard { RepeatBehavior = RepeatBehavior.Forever };
+        var orbitAnim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(3.4)) { RepeatBehavior = RepeatBehavior.Forever };
+        Storyboard.SetTarget(orbitAnim, spin); Storyboard.SetTargetProperty(orbitAnim, new PropertyPath(RotateTransform.AngleProperty));
+        sb.Children.Add(orbitAnim);
+        // the rings lean in and out, in opposite phases — the atom "breathes"
+        var ease = new SineEase { EasingMode = EasingMode.EaseInOut };
+        var lean1 = new DoubleAnimation(-28, -44, TimeSpan.FromSeconds(1.8)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease };
+        var lean2 = new DoubleAnimation(28, 44, TimeSpan.FromSeconds(1.8)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease };
+        Storyboard.SetTarget(lean1, r1);
+        Storyboard.SetTargetProperty(lean1, new PropertyPath("(Border.RenderTransform).(RotateTransform.Angle)"));
+        Storyboard.SetTarget(lean2, r2);
+        Storyboard.SetTargetProperty(lean2, new PropertyPath("(Border.RenderTransform).(RotateTransform.Angle)"));
+        sb.Children.Add(lean1); sb.Children.Add(lean2);
         return (c, sb);
     }
 

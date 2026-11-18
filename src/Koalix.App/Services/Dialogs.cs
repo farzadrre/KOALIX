@@ -8,6 +8,11 @@ public static class Dialogs
     /// <summary>Confirmation dialog in the current language (KOALIX styled, RTL aware). Returns true for "Yes".</summary>
     public static bool Confirm(string title, string message, bool dangerous = false) =>
         Run(() => Controls.KoalixDialog.Show(title, message, Controls.DialogKind.Question, Loc.I["Common.Yes"], Loc.I["Common.No"], dangerous));
+    /// <summary>Confirmation with CUSTOM button labels (v0.4.50) — the "first disconnect" dialog puts its action
+    /// («قطع اتصال») right inside the message instead of leaving a dead end. Returns true for the primary.</summary>
+    public static bool ConfirmCustom(string title, string message, string primary, string secondary, bool dangerous = false) =>
+        Run(() => Controls.KoalixDialog.Show(title, message, Controls.DialogKind.Warning, primary, secondary, dangerous));
+
     public static void Info(string title, string message) =>
         Run(() => Controls.KoalixDialog.Show(title, message, Controls.DialogKind.Info, Loc.I["Common.OK"]));
     public static void Warning(string title, string message) =>

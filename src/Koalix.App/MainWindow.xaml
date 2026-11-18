@@ -16,6 +16,7 @@
     </WindowChrome.WindowChrome>
     <Window.Resources>
         <DataTemplate DataType="{x:Type vm:DashboardViewModel}"><v:DashboardView/></DataTemplate>
+        <DataTemplate DataType="{x:Type vm:TunnelsHubViewModel}"><v:TunnelsHubView/></DataTemplate>
         <DataTemplate DataType="{x:Type vm:DnsViewModel}"><v:DnsView/></DataTemplate>
         <DataTemplate DataType="{x:Type vm:ProfilesViewModel}"><v:ProfilesView/></DataTemplate>
         <DataTemplate DataType="{x:Type vm:SplitTunnelViewModel}"><v:SplitTunnelView/></DataTemplate>
@@ -30,6 +31,11 @@
         <DataTemplate DataType="{x:Type vm:GuideViewModel}"><v:GuideView/></DataTemplate>
     </Window.Resources>
     <Grid x:Name="Root">
+        <!-- v0.4.57 — «تصویر پس‌زمینهٔ شخصی» (idea 6): the user's image, blurred and dimmed, behind everything -->
+        <Image Source="{Binding BgImageSource}" Stretch="UniformToFill" Opacity="0.20" IsHitTestVisible="False"
+               Visibility="{Binding HasBgImage, Converter={StaticResource BoolToVis}}">
+          <Image.Effect><BlurEffect Radius="26"/></Image.Effect>
+        </Image>
         <!-- Tint over the Mica/Acrylic material + slowly drifting accent "aurora" blobs -->
         <Border Background="{DynamicResource ShellTintBrush}"/>
         <Canvas x:Name="Aurora" IsHitTestVisible="False" ClipToBounds="True" Opacity="{DynamicResource AuroraOpacity}" FlowDirection="LeftToRight">
@@ -166,6 +172,66 @@
                         </Button.Template>
                     </Button>
 
+                    <!-- v0.4.50 — «بشه گزینه هارو حذف کرد تا خلوت تر شه … و بشه برشون گردوند»: a tiny edit row under
+                         the menu — toggle edit mode, hide the rows you never use, restore any of them from the same place. -->
+                    <StackPanel DockPanel.Dock="Bottom" Margin="12,2,12,6">
+                        <Button Command="{Binding ToggleNavEditModeCommand}" Cursor="Hand" FocusVisualStyle="{x:Null}" HorizontalAlignment="Stretch"
+                                ToolTip="{l:T Nav.EditMenu.Tip}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="b" CornerRadius="10" Padding="10,6" Background="Transparent" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock x:Name="g" Text="&#xE70F;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="lbl" Text="{l:T Nav.EditMenu}" FontSize="11.5" Foreground="{DynamicResource SubtleTextBrush}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="b" Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+                                        </Trigger>
+                                        <!-- v0.4.52 — «روی ویرایش منو که میزنم هیچ اتفاقی نمیفته»: edit mode now LOOKS on —
+                                             accent pill, check glyph, «پایان ویرایش» label, and the drag hint below. -->
+                                        <DataTrigger Binding="{Binding NavEditMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                            <Setter TargetName="b" Property="Background" Value="{DynamicResource AccentGradientBrush}"/>
+                                            <Setter TargetName="b" Property="BorderBrush" Value="Transparent"/>
+                                            <Setter TargetName="g" Property="Text" Value="&#xE73E;"/>
+                                            <Setter TargetName="g" Property="Foreground" Value="White"/>
+                                            <Setter TargetName="lbl" Property="Text" Value="{l:T Nav.EditMenu.On}"/>
+                                            <Setter TargetName="lbl" Property="Foreground" Value="White"/>
+                                            <Setter TargetName="lbl" Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <TextBlock Text="{l:T Nav.EditHint}" FontSize="10.5" Foreground="{DynamicResource SubtleTextBrush}" TextWrapping="Wrap" Margin="2,5,2,0"
+                                   Visibility="{Binding NavEditMode, Converter={StaticResource BoolToVis}}"/>
+                        <!-- the hidden rows: listed only while editing, each with a one-click restore -->
+                        <TextBlock Text="{l:T Nav.HiddenTitle}" FontSize="10.5" Foreground="{DynamicResource SubtleTextBrush}" Margin="2,6,2,2"
+                                   Visibility="{Binding HasHiddenNav, Converter={StaticResource BoolToVis}}"/>
+                        <ItemsControl ItemsSource="{Binding HiddenNav}" Margin="0,0,0,0"
+                                      Visibility="{Binding HasHiddenNav, Converter={StaticResource BoolToVis}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,2,0,0">
+                                        <TextBlock VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource SubtleTextBrush}"
+                                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis">
+                                            <TextBlock.Text>
+                                                <MultiBinding Converter="{x:Static l:LocMulti.Instance}">
+                                                    <Binding Path="Key"/><Binding Path="Language" Source="{x:Static l:Loc.I}"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                        <Button Command="{Binding DataContext.RestoreNavItemCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding Key}" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand"
+                                                ToolTip="{l:T Nav.Restore.Tip}" Content="&#xE74D;" FontFamily="{StaticResource UiFont}" FontSize="11"
+                                                Padding="6,2" Background="Transparent" Foreground="{DynamicResource AccentBrush}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
                     <!-- v0.4.43: ONE accent rail for the whole menu (NavRail, drawn over the list) glides from the old
                          section to the new one — the per-item pills that popped in and out are gone. -->
                     <Grid x:Name="NavHost" ClipToBounds="True">
@@ -190,14 +256,29 @@
                                             </MultiBinding>
                                         </TextBlock.Text>
                                     </TextBlock>
+                                    <!-- v0.4.50 — the per-row hide button (visible only in menu edit mode) -->
+                                    <Button x:Name="HideBtn" Visibility="Collapsed" Cursor="Hand" Focusable="False"
+                                            Command="{Binding DataContext.HideNavItemCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding Key}" ToolTip="{l:T Nav.HideItem.Tip}"
+                                            Content="&#xE74D;" FontFamily="{StaticResource UiFont}" FontSize="10.5"
+                                            Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center"
+                                            Foreground="{DynamicResource SubtleTextBrush}" Background="Transparent"/>
                                 </StackPanel>
                                 <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding NavEditMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter TargetName="HideBtn" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
                                     <!-- v0.4.22 — THE CLICK RULE: the vector logo animates while its section is open. -->
                                     <DataTrigger Value="True">
                                         <DataTrigger.Binding><Binding Path="IsSelected" RelativeSource="{RelativeSource AncestorType=ListBoxItem}"/></DataTrigger.Binding>
                                         <Setter TargetName="LiveGlyph" Property="c:MotionGlyph.IsActive" Value="True"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Key}" Value="Nav.Split">
+                                        <Setter TargetName="GlyphText" Property="Visibility" Value="Collapsed"/>
+                                        <Setter TargetName="LiveGlyph" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <!-- v0.4.52 — «مدارها»: the renamed section rides its own animated circuit logo -->
+                                    <DataTrigger Binding="{Binding Key}" Value="Nav.TunnelHub">
                                         <Setter TargetName="GlyphText" Property="Visibility" Value="Collapsed"/>
                                         <Setter TargetName="LiveGlyph" Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
@@ -221,6 +302,10 @@
                                     <DataTrigger Binding="{Binding Key}" Value="Nav.Gaming">
                                         <Setter TargetName="GlyphText" Property="Visibility" Value="Collapsed"/>
                                         <Setter TargetName="LiveGlyph" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <!-- v0.4.50 — home stays put: the dashboard row can never be hidden -->
+                                    <DataTrigger Binding="{Binding Key}" Value="Nav.Dashboard">
+                                        <Setter TargetName="HideBtn" Property="Visibility" Value="Collapsed"/>
                                     </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
@@ -323,6 +408,8 @@
             <!-- Page host. v0.4.43: TWO hosts that swap roles (code-behind ShowPage) — the page being left fades out
                  while the new one comes in from the side it sits on in the menu (below → rises, above → drops). -->
             <Grid Grid.Row="1" Grid.Column="1" Margin="26,6,12,12">
+              <!-- v0.4.57 — «حالت فشرده» (idea 8): compact shrinks the whole page host; vector, so nothing blurs -->
+              <Grid.LayoutTransform><ScaleTransform ScaleX="{Binding UiScale}" ScaleY="{Binding UiScale}"/></Grid.LayoutTransform>
                 <ContentControl x:Name="PageHostB" Focusable="False" IsHitTestVisible="False">
                     <ContentControl.RenderTransform><TranslateTransform/></ContentControl.RenderTransform>
                 </ContentControl>

@@ -161,15 +161,13 @@ public static class Fx
 
     private static void RestoreBrushes(Border b, object? origBg, object? origBorder)
     {
-        if (origBg == DependencyProperty.UnsetValue || origBg is null)
-            b.ClearValue(Border.BackgroundProperty);
-        else
-            b.SetValue(Border.BackgroundProperty, origBg);
-
-        if (origBorder == DependencyProperty.UnsetValue || origBorder is null)
-            b.ClearValue(Border.BorderBrushProperty);
-        else
-            b.SetValue(Border.BorderBrushProperty, origBorder);
+        // v0.4.57 — «سرور که انتخاب میکنم شکلش نشون نمیده انتخاب شده، بعد چند بار موس ببرم روش تازه دیده میشه»:
+        // restoring the SAVED local brush erased the IsSelected trigger's accent border (a local SetValue outranks
+        // a trigger setter, so the selection stayed hidden until a re-render). Clearing the local value instead lets
+        // whatever style/trigger owns the brush win again the moment the mouse leaves — the saved brushes are moot.
+        _ = origBg; _ = origBorder;
+        b.ClearValue(Border.BackgroundProperty);
+        b.ClearValue(Border.BorderBrushProperty);
     }
 
     private static DoubleAnimation Animate(RadialGradientBrush brush, double to, double seconds)

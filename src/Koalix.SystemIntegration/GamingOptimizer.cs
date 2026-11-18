@@ -135,7 +135,7 @@ public sealed partial class GamingOptimizer(IProcessRunner runner, NetworkStateJ
         GamingTweak.GameDvrOff => await RevertGameDvrAsync(t, before),
         GamingTweak.CoreParkingOff => await SetCoreParkingRawAsync(t, ParseOr(before, 100), ct),
         GamingTweak.NtfsLastAccessOff => await SetRegRawAsync(t, RegistryHive.LocalMachine, @"SYSTEM\CurrentControlSet\Control\FileSystem", "NtfsDisableLastAccessUpdate", 2, RegistryValueKind.DWord, v => v == "2"),
-        GamingTweak.UltimatePower => await SetSchemeAsync(t, before ?? Balanced, ct),
+        GamingTweak.UltimatePower => await SetSchemeAsync(t, await ResolveRevertSchemeAsync(before, ct), ct),
         GamingTweak.SearchIndexingOff => await StartServiceAsync(t, "WSearch", ct),
         GamingTweak.SysMainOff => await StartServiceAsync(t, "SysMain", ct),
         _ => new TweakResult(t, TweakOutcome.Skipped, null, null, "not applicable"),
@@ -503,12 +503,34 @@ public sealed partial class GamingOptimizer(IProcessRunner runner, NetworkStateJ
         catch (Exception ex) { return new TweakResult(t, TweakOutcome.Failed, null, null, ex.GetType().Name); }
     }
 
+    /// <summary>v0.4.50 («خاموشم نمیشه») — reverting Ultimate must never re-activate AN Ultimate plan. A gamer who
+    /// already ran Ultimate before installing KOALIX journaled it as "before"; restoring it flipped the switch
+    /// straight back ON. If the journaled scheme is (or resolves to) an Ultimate-named plan, fall back to Balanced.</summary>
+    private async Task<string> ResolveRevertSchemeAsync(string? before, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(before)) return Balanced;
+        if (string.Equals(before, Ultimate, StringComparison.OrdinalIgnoreCase)) return Balanced;
+        try
+        {
+            var list = await runner.RunAsync(Pw(), ["/list"], false, null, ct);
+            var ownLine = list.StdOut.Split('\n').FirstOrDefault(l => l.Contains(before, StringComparison.OrdinalIgnoreCase));
+            if (ownLine is not null && ownLine.Contains("Ultimate", StringComparison.OrdinalIgnoreCase)) return Balanced;
+        }
+        catch { /* powercfg unavailable: keep the journaled value unless it IS the well-known Ultimate GUID */ }
+        return before;
+    }
+
     /// <summary>Ultimate Performance: duplicate the well-known scheme (or reuse the existing copy) and activate it.</summary>
     private async Task<TweakResult> ApplyUltimateAsync(GamingTweak t, CancellationToken ct)
     {
         var list = await runner.RunAsync(Pw(), ["/list"], false, null, ct);
-        var guid = GuidRx().Matches(list.StdOut).Select(m => m.Value)
-            .FirstOrDefault(g => list.StdOut.Contains(g, StringComparison.Ordinal) && list.StdOut.Contains("Ultimate", StringComparison.OrdinalIgnoreCase));
+        // v0.4.50 («حالت ultra performance همیشه روشنه و خاموشم نمیشه») — match PER LINE: the old whole-output
+        // Contains("Ultimate") matched the first GUID of the entire listing once ANY Ultimate plan existed
+        // (usually Balanced!) and activated an arbitrary scheme while reporting success.
+        var guid = list.StdOut.Split('\n')
+            .Where(line => line.Contains("Ultimate", StringComparison.OrdinalIgnoreCase))
+            .Select(line => GuidRx().Match(line).Value)
+            .FirstOrDefault(g => g.Length > 0);
         if (guid is null)
         {
             var dup = await runner.RunAsync(Pw(), ["/duplicatescheme", Ultimate], false, null, ct);
@@ -563,7 +585,11 @@ public sealed partial class GamingOptimizer(IProcessRunner runner, NetworkStateJ
         var list = new List<TweakResult>();
         var cur = await runner.RunAsync(Pw(), ["/getactivescheme"], false, null, ct);
         var scheme = GuidRx().Match(cur.StdOut).Value;
-        list.Add(new(GamingTweak.UltimatePower, string.Equals(scheme, Ultimate, StringComparison.OrdinalIgnoreCase) ? TweakOutcome.AlreadySet : TweakOutcome.NotSet, null, scheme.Length > 0 ? scheme : null, null));
+        // v0.4.50 («حالت ultra performance همیشه روشنه و خاموشم نمیشه») — apply activates a DUPLICATE scheme with
+        // a random GUID, so comparing the active GUID against the well-known one always read "off" while the
+        // system actually sat on an Ultimate plan (and every re-inspect snapped the switch). Detect by NAME:
+        // /getactivescheme prints the scheme name and every Ultimate copy carries it.
+        list.Add(new(GamingTweak.UltimatePower, cur.StdOut.Contains("Ultimate", StringComparison.OrdinalIgnoreCase) ? TweakOutcome.AlreadySet : TweakOutcome.NotSet, null, scheme.Length > 0 ? scheme : null, null));
 
         list.Add(InspectReg(RegistryHive.LocalMachine, MmKey, "NetworkThrottlingIndex", IsThrottleDisabled, GamingTweak.MultimediaNetworkThrottling));
         list.Add(InspectReg(RegistryHive.CurrentUser, @"Control Panel\Keyboard", "KeyboardDelay", v => v == "0", GamingTweak.KeyboardRepeat));

@@ -40,6 +40,8 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Localization\*.json" />
+    <EmbeddedResource Include="Defaults\*.json" />
+    <EmbeddedResource Include="WhatsNew.json" />
     <Resource Include="Assets\koalix.ico" />
     <Resource Include="Assets\koalix.png" />
     <Resource Include="Assets\Fonts\*.ttf" />

@@ -91,13 +91,29 @@ public partial class MainWindow : Window
         ThemeService.PreviewApply += OnThemePreviewApply;
         _themeMode = AppHost.Get<ThemeService>().Mode;
         UpdateThemeGlyph(animate: false);
-        IsVisibleChanged += (_, _) => { if (IsVisible) _aurora?.Resume(); else _aurora?.Pause(); };
+        IsVisibleChanged += (_, _) =>
+        {
+            if (IsVisible)
+            {
+                _aurora?.Resume();
+                // v0.4.52 — «تصویر دوتایی میشه»: a reveal frozen by a hidden/minimized window (the animation clock
+                // does not complete while the window is gone) is cleaned up the moment the window returns.
+                if (_themeFading) ForceCleanupReveal();
+            }
+            else _aurora?.Pause();
+        };
 
         // v0.4.20: drag-and-drop IMPORT — drop share links, subscription URLs or a config file anywhere on the
         // window and it goes through the same pipeline as the Tunnels page's Import button.
         AllowDrop = true;
         DragOver += OnImportDragOver;
         Drop += OnImportDrop;
+
+        // v0.4.52 — sidebar drag-reorder while the edit mode is on (user: «میخوام بشه جا به جا هم کرد منورو»).
+        NavList.PreviewMouseLeftButtonDown += NavDragStart;
+        NavList.PreviewMouseMove += NavDragMove;
+        NavList.PreviewMouseLeftButtonUp += (s, e) => NavDragEnd();
+        NavList.MouseLeave += (s, e) => NavDragEnd();
     }
 
     /* ───── Onboarding tour (v0.4.22) — first-run guide, replayable from Settings ───── */
@@ -117,6 +133,85 @@ public partial class MainWindow : Window
     }
 
     private void OnboardingOverlay_KeyDown(object sender, KeyEventArgs e) => Onboarding.HandleKey(e);
+
+    // ───── v0.4.52 — the theme cross-fade watchdog (تصویر دوتایی) ─────
+    // The snapshot overlay could get STUCK — e.g. the window went to the tray mid-reveal and the animation clock
+    // never completed — leaving the frozen old look sitting on top of the live UI as a ghost copy. The watchdog
+    // force-clears the reveal no matter what, and returning from a hidden window cleans it up immediately.
+    private System.Windows.Threading.DispatcherTimer? _revealWatchdog;
+
+    private void StartRevealWatchdog()
+    {
+        _revealWatchdog ??= new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.8) };
+        _revealWatchdog.Tick -= RevealWatchdogTick;
+        _revealWatchdog.Tick += RevealWatchdogTick;
+        _revealWatchdog.Stop();
+        _revealWatchdog.Start();
+    }
+
+    private void RevealWatchdogTick(object? sender, EventArgs e)
+    {
+        if (_themeFading) ForceCleanupReveal();
+        _revealWatchdog?.Stop();
+    }
+
+    private void ForceCleanupReveal()
+    {
+        _revealToken++;
+        _themeFading = false;
+        _revealWatchdog?.Stop();
+        ThemeOverlay.Visibility = Visibility.Collapsed;
+        ThemeRing.Visibility = Visibility.Collapsed;
+        ThemeWave.Visibility = Visibility.Collapsed;
+        ThemeSnapshot.Clip = null;
+        ThemeSnapshot.Source = null;
+    }
+
+    /* ───── v0.4.52 — sidebar drag-reorder (active only in menu edit mode) ───── */
+    private Point? _navDragStart;
+    private int _navDragIndex = -1;
+    private bool _navDragging;
+
+    private void NavDragStart(object sender, MouseButtonEventArgs e)
+    {
+        _navDragging = false;
+        _navDragIndex = NavIndexUnder(e);
+        _navDragStart = _navDragIndex >= 0 ? e.GetPosition(NavList) : null;
+    }
+
+    private void NavDragMove(object sender, MouseEventArgs e)
+    {
+        if (_navDragStart is null || _navDragIndex < 0 || e.LeftButton != MouseButtonState.Pressed) return;
+        if (!_navDragging && (e.GetPosition(NavList) - _navDragStart.Value).Length < 10) return;
+        if (DataContext is not ViewModels.MainViewModel { NavEditMode: true } vm) return;
+        _navDragging = true;
+        var to = NavIndexUnder(e);
+        if (to >= 0 && to != _navDragIndex)
+        {
+            vm.MoveNavItem(_navDragIndex, to);
+            _navDragIndex = to;
+        }
+    }
+
+    private void NavDragEnd()
+    {
+        _navDragStart = null;
+        _navDragIndex = -1;
+        _navDragging = false;
+    }
+
+    /// <summary>Index (in the VM's Nav collection) of the sidebar row under the mouse; -1 when none.</summary>
+    private int NavIndexUnder(MouseEventArgs e)
+    {
+        for (var i = 0; i < NavList.Items.Count; i++)
+        {
+            if (NavList.ItemContainerGenerator.ContainerFromIndex(i) is not ListBoxItem { ActualHeight: > 0 } it) continue;
+            var p = e.GetPosition(it);
+            if (p.X >= 0 && p.X <= it.ActualWidth && p.Y >= 0 && p.Y <= it.ActualHeight)
+                return NavList.Items[i] is ViewModels.NavItem n && DataContext is ViewModels.MainViewModel vm ? vm.Nav.IndexOf(n) : -1;
+        }
+        return -1;
+    }
 
     /* ───── Theme circular wave (v0.4.24) — «تعویض تم تیره/روشن با موج دایره‌ای که از دکمهٔ خورشید پخش می‌شود» ───── */
 
@@ -191,8 +286,14 @@ public partial class MainWindow : Window
             }
             _revealIsMode = modeFlip;
             _themeFading = true;
+            StartRevealWatchdog();
         }
-        catch (Exception ex) { StartupLog.Trace("theme snapshot: " + ex.Message); _themeFading = false; }
+        catch (Exception ex)
+        {
+            StartupLog.Trace("theme snapshot: " + ex.Message);
+            _themeFading = false;
+            ThemeOverlay.Visibility = Visibility.Collapsed; // never leave a half-built reveal over the UI
+        }
     }
 
     /// <summary>Fires AFTER the swap: a true circular reveal — the OLD look (snapshot) gets a growing hole cut into it,
@@ -234,6 +335,8 @@ public partial class MainWindow : Window
                 ThemeRing.Visibility = Visibility.Collapsed;
                 ThemeSnapshot.Clip = null;
                 ThemeSnapshot.Source = null; // release the bitmap
+                _themeFading = false; // v0.4.52 — the reveal is done, stop treating it as in-flight
+                _revealWatchdog?.Stop();
             };
             _revealHole.BeginAnimation(EllipseGeometry.RadiusXProperty, grow);
             _revealHole.BeginAnimation(EllipseGeometry.RadiusYProperty, grow);

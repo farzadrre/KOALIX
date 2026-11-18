@@ -8,7 +8,7 @@ using System.Windows.Threading;
 namespace Koalix.App.Services;
 
 public enum AppTheme { Dark, Light }
-public enum Backdrop { Mica, Acrylic, None }
+public enum Backdrop { Auto, Mica, Acrylic, MicaAlt, None } // v0.4.56 — «جنس پنجره بیشتر هم میشه اضافه کنی حتی»: +Auto and MicaAlt
 
 /// <summary>
 /// Theme swapping, accent palette generation and Windows 11 window material (Mica/Acrylic via DWMWA_SYSTEMBACKDROP_TYPE,
@@ -52,6 +52,7 @@ public sealed class ThemeService
         ApplyAccent(accentHex ?? Accent);
         WriteStyle();
         foreach (Window w in Application.Current.Windows) if (!w.AllowsTransparency) ApplyBackdrop(w, Backdrop);
+        if (Oled) SetOled(Mode == AppTheme.Dark); // v0.4.57 — OLED surfaces re-apply (or clear) after every theme flip
         Changed?.Invoke();
         Restyled?.Invoke();
     }
@@ -62,7 +63,8 @@ public sealed class ThemeService
        acrylic window). Both live in one merged dictionary re-written on every theme flip; the accent-tied bits (neon
        edge glow, retro outline) are written with the accent so the ARGB palette drives them too. */
     public const string StyleKey = "ui.style", GlassKey = "ui.glass";
-    public static readonly string[] Styles = ["default", "neon", "minimal", "retro"];
+    // v0.4.55 — «سبک ظاهری های جدید هم اضافه کن»: vivid (پرنور), mono (مونو) and soft (لطیف) join the picker.
+    public static readonly string[] Styles = ["default", "neon", "minimal", "retro", "vivid", "mono", "soft"];
     /// <summary>Static because <see cref="ApplyFont"/> is static (fonts follow both language and style).</summary>
     public static string StyleName { get; private set; } = "default";
     public bool Glass { get; private set; }
@@ -89,6 +91,9 @@ public sealed class ThemeService
         "neon" => (18, 12),
         "minimal" => (8, 6),
         "retro" => (3, 2),
+        "vivid" => (22, 14),
+        "mono" => (4, 3),
+        "soft" => (26, 16),
         _ => (16, 10),
     };
 
@@ -113,6 +118,24 @@ public sealed class ThemeService
             case "neon":
                 r["CardBrush"] = Frozen(new LinearGradientBrush(light ? Color.FromArgb(0xE6, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x59, 0x14, 0x10, 0x2A),
                     light ? Color.FromArgb(0xC0, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x33, 0x08, 0x0A, 0x18), new Point(0, 0), new Point(1, 1)));
+                break;
+            // v0.4.55 — the three new presets
+            case "vivid": // پرنور: saturated accent-tinted cards that pop against any backdrop
+                r["CardBrush"] = Frozen(new LinearGradientBrush(light ? Color.FromArgb(0xEC, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x8C, 0x1C, 0x1B, 0x3C),
+                    light ? Color.FromArgb(0xD8, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x66, 0x14, 0x12, 0x30), new Point(0, 0), new Point(1, 1)));
+                r["CardBorderBrush"] = Frozen(new LinearGradientBrush(Color.FromArgb(0x88, _accentNow.R, _accentNow.G, _accentNow.B),
+                    Color.FromArgb(0x22, _accentNow.R, _accentNow.G, _accentNow.B), new Point(0, 0), new Point(1, 1)));
+                r["AuroraOpacity"] = 0.6;
+                break;
+            case "mono": // مونو: flat ink-on-ink, hairline borders, zero colour noise
+                r["CardBrush"] = Frozen(new SolidColorBrush(light ? Color.FromArgb(0xF7, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0xE8, 0x11, 0x12, 0x17)));
+                r["CardBorderBrush"] = Frozen(new SolidColorBrush(light ? Color.FromArgb(0x1F, 0, 0, 0) : Color.FromArgb(0x1C, 0xFF, 0xFF, 0xFF)));
+                r["AuroraOpacity"] = 0.0;
+                break;
+            case "soft": // لطیف: creamy pastel surfaces with the softest corners in the family
+                r["CardBrush"] = Frozen(new LinearGradientBrush(light ? Color.FromArgb(0xF4, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0xC0, 0x19, 0x1D, 0x2B),
+                    light ? Color.FromArgb(0xEA, 0xF6, 0xF7, 0xFB) : Color.FromArgb(0x8C, 0x14, 0x17, 0x24), new Point(0.2, 0), new Point(0.8, 1)));
+                r["AuroraOpacity"] = 0.35;
                 break;
         }
         if (Glass)
@@ -323,6 +346,92 @@ public sealed class ThemeService
         r["DisplayFont"] = language == "fa" ? new FontFamily(pack, dispFa) : new FontFamily(dispEn);
     }
 
+    /* ── v0.4.57 — the beauty batch: auto day/night (idea 1), a free accent-hue slider (idea 2) and the
+       OLED pure-black surfaces (idea 5) — «ایده های شماره 1و2و5 و اجراشون کن» ── */
+
+    public const string AutoKey = "ui.autoTheme", SunriseKey = "ui.autoSunrise", SunsetKey = "ui.autoSunset";
+    public const string HueKey = "ui.accentHue", HueOnKey = "ui.accentHueOn";
+    public const string OledKey = "ui.oled";
+
+    /// <summary>Auto day/night: Light between sunrise and sunset, Dark otherwise (checked once a minute).</summary>
+    public bool AutoTheme { get; private set; }
+    public double AutoSunrise { get; private set; } = 7;
+    public double AutoSunset { get; private set; } = 19;
+    private System.Windows.Threading.DispatcherTimer? _autoTimer;
+
+    public void SetAutoTheme(bool on, double sunrise, double sunset)
+    {
+        AutoTheme = on;
+        AutoSunrise = Math.Clamp(sunrise, 0, 23.99);
+        AutoSunset = Math.Clamp(sunset, 0, 23.99);
+        if (!on) return;
+        if (_autoTimer is null)
+        {
+            _autoTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
+            _autoTimer.Tick += (_, _) => { if (AutoTheme) EvaluateAutoTheme(); };
+            _autoTimer.Start();
+        }
+        EvaluateAutoTheme();
+    }
+
+    private void EvaluateAutoTheme()
+    {
+        var now = DateTime.Now.TimeOfDay.TotalHours;
+        var day = AutoSunrise <= AutoSunset
+            ? now >= AutoSunrise && now < AutoSunset
+            : !(now >= AutoSunset && now < AutoSunrise); // overnight window (e.g. sunset 19 → sunrise 7)
+        var want = day ? AppTheme.Light : AppTheme.Dark;
+        if (Mode != want) Apply(want);
+    }
+
+    /// <summary>Live accent swap for the hue slider — no theme-dictionary reload, cheap enough to follow the thumb.</summary>
+    public void SetAccentLive(string hex)
+    {
+        var c = (Color)ColorConverter.ConvertFromString(hex);
+        Accent = hex;
+        WriteAccent(_rgb is not null ? RgbColor(_hue) : c);
+    }
+
+    /// <summary>A pleasing accent colour from a 0-360 hue (fixed saturation/lightness) — the v0.4.37 rainbow's
+    /// <see cref="FromHsl"/> does the maths.</summary>
+    public static string HueHex(double hue) => Hex(FromHsl(Math.Clamp(hue, 0, 359.9), 0.62, 0.56));
+    private static string Hex(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+
+    /// <summary>OLED pure black (idea 5): real #000 surfaces so AMOLED/laptop panels stay dark and save power.
+    /// Re-applied after every theme flip; leaving dark (or toggling off) removes the overrides so the theme
+    /// dictionary speaks again.</summary>
+    public bool Oled { get; private set; }
+    private static readonly string[] OledKeys =
+    [
+        "WindowColor", "WindowBrush", "SidebarBrush", "CardBrush", "CardHoverBrush", "ControlBrush",
+        "ControlHoverBrush", "ControlPressedBrush", "BorderBrush", "StrongBorderBrush", "InputBrush",
+        "PopupBrush", "TrackBrush", "ShellTintBrush",
+    ];
+    public void SetOled(bool on)
+    {
+        Oled = on;
+        var r = Application.Current.Resources;
+        if (!on || Mode != AppTheme.Dark)
+        {
+            foreach (var k in OledKeys) r.Remove(k);
+            return;
+        }
+        r["WindowColor"] = Color.FromRgb(0, 0, 0);
+        r["WindowBrush"] = Frozen(new SolidColorBrush(Color.FromRgb(0, 0, 0)));
+        r["SidebarBrush"] = Frozen(new SolidColorBrush(Color.FromArgb(0x66, 0, 0, 0)));
+        r["CardBrush"] = Frozen(new LinearGradientBrush(Color.FromRgb(0x0A, 0x0A, 0x0A), Color.FromRgb(0x04, 0x04, 0x04), new Point(0, 0), new Point(1, 1)));
+        r["CardHoverBrush"] = Frozen(new SolidColorBrush(Color.FromRgb(0x12, 0x12, 0x12)));
+        r["ControlBrush"] = Frozen(new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x14)));
+        r["ControlHoverBrush"] = Frozen(new SolidColorBrush(Color.FromRgb(0x1C, 0x1C, 0x1C)));
+        r["ControlPressedBrush"] = Frozen(new SolidColorBrush(Color.FromRgb(0x24, 0x24, 0x24)));
+        r["BorderBrush"] = Frozen(new SolidColorBrush(Color.FromRgb(0x22, 0x22, 0x22)));
+        r["StrongBorderBrush"] = Frozen(new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)));
+        r["InputBrush"] = Frozen(new SolidColorBrush(Color.FromRgb(0x0D, 0x0D, 0x0D)));
+        r["PopupBrush"] = Frozen(new SolidColorBrush(Color.FromRgb(0x0A, 0x0A, 0x0A)));
+        r["TrackBrush"] = Frozen(new SolidColorBrush(Color.FromRgb(0x16, 0x16, 0x16)));
+        r["ShellTintBrush"] = Frozen(new SolidColorBrush(Color.FromArgb(0x55, 0, 0, 0)));
+    }
+
     public void ApplyBackdrop(Window w, Backdrop backdrop)
     {
         Backdrop = backdrop;
@@ -336,7 +445,8 @@ public sealed class ThemeService
         var effective = Glass ? Backdrop.Acrylic : backdrop; // v0.4.38 glass mode = acrylic window under frosted cards
         if (Environment.OSVersion.Version.Build >= 22621 && effective != Backdrop.None)
         {
-            int type = effective == Backdrop.Mica ? 2 : 3; // DWMSBT_MAINWINDOW / DWMSBT_TRANSIENTWINDOW (acrylic)
+            // v0.4.56 — the real DWMSBT values: 1 Auto, 2 None, 3 Mica, 4 Acrylic, 5 MicaAlt
+            int type = effective switch { Backdrop.Auto => 1, Backdrop.Mica => 3, Backdrop.Acrylic => 4, Backdrop.MicaAlt => 5, _ => 2 };
             var m = new Margins { L = -1, R = -1, T = -1, B = -1 };
             DwmExtendFrameIntoClientArea(hwnd, ref m);
             BackdropActive = DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref type, 4) == 0;

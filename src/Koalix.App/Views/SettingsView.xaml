@@ -33,17 +33,28 @@
           <StackPanel Margin="0,0,16,0"><TextBlock Text="{l:T Settings.Theme}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
             <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme2}"><ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="NoWrap"><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Theme"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
           <StackPanel Margin="0,0,16,0"><TextBlock Text="{l:T Settings.Backdrop}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
-            <ComboBox ItemsSource="{Binding Backdrops}" SelectedItem="{Binding Backdrop}"><ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="NoWrap"><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Backdrop"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+            <ComboBox ItemsSource="{Binding Backdrops}" SelectedItem="{Binding Backdrop}"><ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="NoWrap"><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Backdrop"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text><TextBlock.ToolTip><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="BackdropTip"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.ToolTip></TextBlock></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+          <!-- v0.4.52 — selectable animated backgrounds (user: «بک گراند های متحرک بیشتری و اضافه کنی و قابل انتخاب باشن»):
+               particles & waves, constellation, orbits, meteors — or off. -->
+          <StackPanel Margin="0,0,16,0"><TextBlock Text="{l:T Settings.LiveBg}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+            <ComboBox ItemsSource="{Binding LiveBgKinds}" SelectedItem="{Binding LiveBgKind}"><ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="NoWrap"><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="LiveBg"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text><TextBlock.ToolTip><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="LiveBgTip"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.ToolTip></TextBlock></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
           <!-- v0.4.14: connect-button shape — rounded tile (0.4.13 look) or the classic circle orb, with a live mini preview in the dropdown. -->
           <StackPanel Margin="0,0,16,0" ToolTip="{l:T Settings.ConnectShapeHint}"><TextBlock Text="{l:T Settings.ConnectShape}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
             <ComboBox ItemsSource="{Binding ConnectShapes}" SelectedItem="{Binding ConnectShape}" MinWidth="190">
               <ComboBox.ItemTemplate>
                 <DataTemplate>
+                  <!-- v0.4.54 — «شکل دکمه اتصال هم چند مدل کن»: five silhouettes with live previews -->
                   <StackPanel Orientation="Horizontal">
                     <Border x:Name="sq" Width="16" Height="16" CornerRadius="5" Background="{DynamicResource AccentGradientBrush}" VerticalAlignment="Center"/>
                     <Border x:Name="ci" Width="16" Height="16" CornerRadius="8" Background="{DynamicResource AccentGradientBrush}" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    <Path x:Name="hx" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource AccentGradientBrush}" Data="M 8,0 L 16,4 L 16,12 L 8,16 L 0,12 L 0,4 Z" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    <Path x:Name="sh" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource AccentGradientBrush}" Data="M 8,0 C 11,1 14,2 14,5 L 14,9 C 14,12.5 11,14.5 8,16 C 5,14.5 2,12.5 2,9 L 2,5 C 2,2 5,1 8,0 Z" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    <Path x:Name="dm" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource AccentGradientBrush}" Data="M 8,0 L 16,8 L 8,16 L 0,8 Z" VerticalAlignment="Center" Visibility="Collapsed"/>
                     <TextBlock x:Name="tsq" Text="{l:T Settings.ShapeRounded}" Margin="9,0,0,0" TextWrapping="NoWrap"/>
                     <TextBlock x:Name="tci" Text="{l:T Settings.ShapeCircle}" Margin="9,0,0,0" TextWrapping="NoWrap" Visibility="Collapsed"/>
+                    <TextBlock x:Name="thx" Text="{l:T Settings.ShapeHex}" Margin="9,0,0,0" TextWrapping="NoWrap" Visibility="Collapsed"/>
+                    <TextBlock x:Name="tsh" Text="{l:T Settings.ShapeShield}" Margin="9,0,0,0" TextWrapping="NoWrap" Visibility="Collapsed"/>
+                    <TextBlock x:Name="tdm" Text="{l:T Settings.ShapeDiamond}" Margin="9,0,0,0" TextWrapping="NoWrap" Visibility="Collapsed"/>
                   </StackPanel>
                   <DataTemplate.Triggers>
                     <DataTrigger Binding="{Binding}" Value="circle">
@@ -52,10 +63,31 @@
                       <Setter TargetName="tsq" Property="Visibility" Value="Collapsed"/>
                       <Setter TargetName="tci" Property="Visibility" Value="Visible"/>
                     </DataTrigger>
+                    <DataTrigger Binding="{Binding}" Value="hex">
+                      <Setter TargetName="sq" Property="Visibility" Value="Collapsed"/>
+                      <Setter TargetName="hx" Property="Visibility" Value="Visible"/>
+                      <Setter TargetName="tsq" Property="Visibility" Value="Collapsed"/>
+                      <Setter TargetName="thx" Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding}" Value="shield">
+                      <Setter TargetName="sq" Property="Visibility" Value="Collapsed"/>
+                      <Setter TargetName="sh" Property="Visibility" Value="Visible"/>
+                      <Setter TargetName="tsq" Property="Visibility" Value="Collapsed"/>
+                      <Setter TargetName="tsh" Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding}" Value="diamond">
+                      <Setter TargetName="sq" Property="Visibility" Value="Collapsed"/>
+                      <Setter TargetName="dm" Property="Visibility" Value="Visible"/>
+                      <Setter TargetName="tsq" Property="Visibility" Value="Collapsed"/>
+                      <Setter TargetName="tdm" Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
                   </DataTemplate.Triggers>
                 </DataTemplate>
               </ComboBox.ItemTemplate>
             </ComboBox></StackPanel>
+          <!-- v0.4.54 — «داخلش انیمیشن و متحرک بودنش هم چن مدل بکن بشه انتخاب کرد»: the liquid inside the button -->
+          <StackPanel Margin="0,0,16,0" ToolTip="{l:T Settings.ConnectMotionHint}"><TextBlock Text="{l:T Settings.ConnectMotion}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
+            <ComboBox ItemsSource="{Binding ConnectMotions}" SelectedItem="{Binding ConnectMotion}" MinWidth="190"><ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="NoWrap"><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Settings.Motion"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text><TextBlock.ToolTip><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Settings.MotionTip"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.ToolTip></TextBlock></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
           <!-- v0.4.38 - style presets: corners + fonts + card surface -->
           <StackPanel Margin="0,0,16,0" ToolTip="{l:T Settings.StyleHint}"><TextBlock Text="{l:T Settings.Style}" Style="{StaticResource Subtle}" Margin="0,0,0,4"/>
             <ComboBox ItemsSource="{Binding UiStyles}" SelectedItem="{Binding UiStyle}" MinWidth="170"><ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="NoWrap"><TextBlock.Text><MultiBinding Converter="{x:Static l:LocMulti.Instance}" ConverterParameter="Style"><Binding /><Binding Path="Language" Source="{x:Static l:Loc.I}"/></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
@@ -64,6 +96,33 @@
         </WrapPanel>
         <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.Glass}" IsChecked="{Binding Glass}" Margin="0,10,0,0" HorizontalAlignment="Left" MinWidth="380"/>
         <TextBlock Text="{l:T Settings.GlassHint}" Style="{StaticResource Subtle}"/>
+        <!-- v0.4.57 — the beauty batch (ideas 1, 2, 5, 6, 8) -->
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.AutoTheme}" IsChecked="{Binding AutoTheme}" Margin="0,10,0,0" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.AutoThemeHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding AutoTheme, Converter={StaticResource BoolToVis}}">
+          <TextBlock Text="{l:T Settings.AutoSunrise}" Style="{StaticResource Subtle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+          <Slider Minimum="0" Maximum="23" IsSnapToTickEnabled="True" TickFrequency="1" Value="{Binding AutoSunrise}" Width="170" VerticalAlignment="Center" FlowDirection="LeftToRight"/>
+          <TextBlock Text="{Binding AutoSunrise, StringFormat={}{0:0}:00}" Style="{StaticResource Subtle}" VerticalAlignment="Center" Margin="6,0,16,0"/>
+          <TextBlock Text="{l:T Settings.AutoSunset}" Style="{StaticResource Subtle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+          <Slider Minimum="0" Maximum="23" IsSnapToTickEnabled="True" TickFrequency="1" Value="{Binding AutoSunset}" Width="170" VerticalAlignment="Center" FlowDirection="LeftToRight"/>
+          <TextBlock Text="{Binding AutoSunset, StringFormat={}{0:0}:00}" Style="{StaticResource Subtle}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+        </StackPanel>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.AccentHue}" IsChecked="{Binding AccentHueOn}" Margin="0,10,0,0" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.AccentHueHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" Margin="0,6,0,0" IsEnabled="{Binding AccentHueOn}">
+          <TextBlock Text="{l:T Settings.Hue}" Style="{StaticResource Subtle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+          <Slider Minimum="0" Maximum="359" Value="{Binding AccentHue}" Width="260" VerticalAlignment="Center" FlowDirection="LeftToRight"/>
+          <Border Width="26" Height="26" CornerRadius="8" Margin="10,0,0,0" Background="{DynamicResource AccentBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"/>
+        </StackPanel>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.Oled}" IsChecked="{Binding Oled}" Margin="0,10,0,0" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.OledHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+        <CheckBox Style="{StaticResource Switch}" Content="{l:T Settings.Compact}" IsChecked="{Binding Compact}" Margin="0,10,0,0" HorizontalAlignment="Left" MinWidth="380"/>
+        <TextBlock Text="{l:T Settings.CompactHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+          <Button Command="{Binding PickBgImageCommand}" Padding="10,5" Content="{l:T Settings.BgPick}"/>
+          <Button Command="{Binding ClearBgImageCommand}" Padding="10,5" Margin="8,0,0,0" Content="{l:T Settings.BgClear}"/>
+        </StackPanel>
+        <TextBlock Text="{l:T Settings.BgImageHint}" Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
         <!-- v0.4.26 — THE COLOUR WORKSHOP (user: «بخش رنگ تاکیدی و پالت رنگی یکی ان باهم ادغامشون کن و قابلیتشونو
              بیشتر کن»): the palette cards and the accent picker are ONE section now — named palette cards (plus the
              user's own SAVED cards, deletable), the accent swatch grid, a random-accent die, save-current-as-palette,
@@ -407,16 +466,45 @@
       </StackPanel>
     </Border>
 
-    <!-- One-click backup / restore (v0.4.12): encrypted single file — settings, profiles, subscriptions, rules, DNS. -->
+    <!-- One-click backup / restore (v0.4.12 → v0.4.50): encrypted single file — settings, profiles, subscriptions,
+         rules, DNS. v0.4.50: the card finally got its graphics (icon tile + live bars emblem + real buttons), the
+         tunnel gate asks instead of whispering into a StatusMessage, and an EMPTY password = «بدون رمز» file. -->
     <Border Style="{StaticResource Card}">
       <StackPanel>
-        <TextBlock Text="{l:T Backup.Title}" Style="{StaticResource CardTitle}"/>
-        <TextBlock Text="{l:T Backup.Hint}" Style="{StaticResource Subtle}" Margin="0,0,0,10"/>
         <StackPanel Orientation="Horizontal">
-          <Button Content="{l:T Backup.Create}" Command="{Binding BackupCommand}" Style="{StaticResource AccentButton}"/>
-          <Button Content="{l:T Backup.Restore}" Command="{Binding RestoreCommand}"/>
+          <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource AccentSoftBrush}">
+            <TextBlock Text="&#xE777;" Style="{StaticResource Icon}" FontSize="17" HorizontalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+          </Border>
+          <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+            <TextBlock Text="{l:T Backup.Title}" Style="{StaticResource CardTitle}"/>
+            <TextBlock Text="{l:T Backup.Hint}" Style="{StaticResource Subtle}" FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap"/>
+          </StackPanel>
         </StackPanel>
-        <TextBlock Text="{l:T Backup.Note}" Style="{StaticResource Subtle}" FontSize="11" Margin="0,8,0,0"/>
+        <!-- v0.4.52 — «کادر بکاپ گیری هم خیلی زشته … بهترش کن»: full-width action row, and the result now lives
+             INSIDE the card as a status tile (v0.4.52: «بالای صفخه نیاد بنویسه ذخیره شد … تو تب بکاپ بنویسه اونو»). -->
+        <Grid Margin="0,14,0,0">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <Button Command="{Binding BackupCommand}" Style="{StaticResource AccentButton}" Padding="16,8" FontSize="12" HorizontalAlignment="Right">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE898;" Style="{StaticResource Icon}" FontSize="12.5" VerticalAlignment="Center"/>
+              <TextBlock Text="{l:T Backup.Create}" FontWeight="SemiBold" Margin="7,0,0,0"/>
+            </StackPanel>
+          </Button>
+          <Button Command="{Binding RestoreCommand}" Padding="16,8" FontSize="12" Grid.Column="1" Margin="10,0,0,0">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE8B5;" Style="{StaticResource Icon}" FontSize="12.5" VerticalAlignment="Center"/>
+              <TextBlock Text="{l:T Backup.Restore}" FontWeight="SemiBold" Margin="7,0,0,0"/>
+            </StackPanel>
+          </Button>
+        </Grid>
+        <Border CornerRadius="9" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                Padding="11,8" Margin="0,12,0,0" Visibility="{Binding HasBackupStatus, Converter={StaticResource BoolToVis}}">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE73E;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding BackupStatus}" FontSize="11.5" Margin="8,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+        <TextBlock Text="{l:T Backup.Note}" Style="{StaticResource Subtle}" FontSize="11" Margin="0,10,0,0" TextWrapping="Wrap"/>
       </StackPanel>
     </Border>
   </StackPanel></ScrollViewer>

@@ -1,0 +1,522 @@
+<UserControl x:Class="Koalix.App.Views.TunnelsHubView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:Koalix.App.Localization"
+             xmlns:c="clr-namespace:Koalix.App.Controls">
+  <!-- v0.4.50 — the advanced-tunnels PAGE (user: «بخش aether و warp و کلا از تو داشبورد بیاری بیرون و تو منوی سمت
+       راست … یک ردیف … تو همون یک ردیف هم warp قابل انتخاب باشه هم aether»). ONE row with two selectable tunnel
+       pills, and each section carries its own graphics/animation from the connect button down to its settings:
+       WARP = blue with a breathing glow, Aether = violet with a shimmer sweep. The panels keep their Dashboard
+       bindings (DataContext is set in code-behind) — same commands, same settings, zero rewiring. -->
+  <UserControl.Resources>
+    <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    <LinearGradientBrush x:Key="HubWarpBrush" StartPoint="0,0" EndPoint="1,1">
+      <!-- v0.4.54 — the WARP gradient follows the accent palette instead of the hardcoded blues -->
+      <GradientStop Color="{DynamicResource AccentColor}" Offset="0"/><GradientStop Color="{DynamicResource Accent2Color}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="HubAetherBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#6D28D9" Offset="0"/><GradientStop Color="#C026D3" Offset="1"/>
+    </LinearGradientBrush>
+    <Style x:Key="HubPillWarp" TargetType="RadioButton">
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border x:Name="bd" CornerRadius="11" Padding="10,6" Background="{DynamicResource ControlBrush}"
+                    BorderThickness="1.4" BorderBrush="{DynamicResource BorderBrush}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="HubPillAether" TargetType="RadioButton" BasedOn="{StaticResource HubPillWarp}">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border x:Name="bd" CornerRadius="11" Padding="10,6" Background="{DynamicResource ControlBrush}"
+                    BorderThickness="1.4" BorderBrush="{DynamicResource BorderBrush}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource Accent2Brush}"/>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </UserControl.Resources>
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel MaxWidth="1040" HorizontalAlignment="Center" Margin="26,22,26,30">
+
+      <!-- page header + THE row: WARP | Aether side by side, each with its own live state -->
+      <Border Style="{StaticResource Card}" Padding="16,12">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource AccentSoftBrush}">
+              <!-- v0.4.54 — «لوگوی مدار داخل خود بخش مدار بالای صفحه هنوز همون قبلیه»: the header now carries the live circuit mark -->
+              <c:MotionGlyph Key="Circuit" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+            </Border>
+            <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+              <TextBlock Text="{l:T TunnelHub.Title}" Style="{StaticResource CardTitle}" FontSize="17"/>
+              <TextBlock Text="{l:T TunnelHub.Sub}" Style="{StaticResource Subtle}" FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+          </StackPanel>
+          <TextBlock Text="{l:T TunnelHub.Pick}" Style="{StaticResource Subtle}" FontSize="11.5" Margin="0,12,0,6"/>
+          <!-- v0.4.53 — «کوچکتر نکردی دکمه انتخاب کردنشو … باگ داره و دیده نمیشه»: the old pills stretched to
+               HALF the page each and grew tall from their status line. Two compact size-to-content chips now:
+               icon + title + a status dot (grey off, green/purple on). -->
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,2,0,0">
+            <RadioButton GroupName="tunnelhub" Style="{StaticResource HubPillWarp}" Margin="0,0,8,0"
+                         IsChecked="{Binding TunnelsTabChain, Mode=TwoWay}" Command="{Binding TunnelsOpenChainCommand}">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE71B;" Style="{StaticResource Icon}" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                <TextBlock Text="{l:T Tunnels.Tab.Chain}" FontSize="12" FontWeight="Bold" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}"/> <!-- v0.4.57 — «متن بالا سیاهه سفیدش کن» -->
+                <Border Width="8" Height="8" CornerRadius="3" Background="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center" Margin="8,1,0,0">
+                  <Border.Style>
+                    <Style TargetType="Border">
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding ChainEnabled}" Value="True">
+                          <Setter Property="Background" Value="#34D399"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Border.Style>
+                </Border>
+              </StackPanel>
+            </RadioButton>
+            <RadioButton GroupName="tunnelhub" Style="{StaticResource HubPillAether}"
+                         IsChecked="{Binding TunnelsTabAether, Mode=TwoWay}" Command="{Binding TunnelsOpenAetherCommand}">
+              <StackPanel Orientation="Horizontal">
+                <!-- v0.4.52 — «لوگوی اتر هم تکراریه عوضش کن»: DNS's globe is gone; Aether rides its own animated atom -->
+                <c:MotionGlyph Key="Aether" Width="14" Height="14" IsActive="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=RadioButton}}" VerticalAlignment="Center" Foreground="{DynamicResource Accent2Brush}"/>
+                <TextBlock Text="{l:T Tunnels.Tab.Aether}" FontSize="12" FontWeight="Bold" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}"/> <!-- v0.4.57 — white on the dark pill -->
+                <Border Width="8" Height="8" CornerRadius="3" Background="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center" Margin="8,1,0,0">
+                  <Border.Style>
+                    <Style TargetType="Border">
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding AetherIsConnected}" Value="True">
+                          <Setter Property="Background" Value="{DynamicResource Accent2Brush}"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Border.Style>
+                </Border>
+              </StackPanel>
+            </RadioButton>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- ══════════ WARP section — its own blue identity ══════════ -->
+      <Border Style="{StaticResource Card}" Margin="0,10,0,0" Padding="16,12"
+              Visibility="{Binding TunnelsTabChainPanel, Converter={StaticResource BoolToVis}}">
+        <StackPanel>
+            <!-- v0.4.50 — the hub header: WARP's own identity (blue, breathing glow). The action button IS the
+                 chain switch, styled as the tunnel's own; the dashboard card's fold arrow / «بستن» are gone with it. -->
+            <Grid Margin="0,2,0,0">
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- v0.4.54 — «رنگ حالت وارپ و اتر به بک گراند نمیخوره»: the blues followed the hardcoded palette; they ride the accent now -->
+                <Border x:Name="WarpGlow" Width="26" Height="26" CornerRadius="8" Background="{DynamicResource AccentSoftBrush}">
+                  <Border.Effect>
+                    <DropShadowEffect Color="{DynamicResource AccentColor}" BlurRadius="18" ShadowDepth="0" Opacity="0.3"/>
+                  </Border.Effect>
+                  <TextBlock Text="&#xE71B;" Style="{StaticResource Icon}" FontSize="12" HorizontalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+                </Border>
+                <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                  <TextBlock Text="{l:T Chain.Title}" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/> <!-- v0.4.56 — «متن وارپ باید سفید بشه» -->
+                </StackPanel>
+              </StackPanel>
+              <Button Command="{Binding ChainToggleCommand}" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand" Focusable="False">
+                <Button.Template>
+                  <ControlTemplate TargetType="Button">
+                    <Border x:Name="bd" CornerRadius="10" Padding="11,5" Background="{StaticResource HubWarpBrush}">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="glyph" Text="&#xE768;" Style="{StaticResource Icon}" FontSize="13" Foreground="White" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="lbl" Text="{l:T TunnelHub.WarpEnable}" Foreground="White" FontSize="12.5" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                      <Trigger Property="IsMouseOver" Value="True">
+                        <Setter TargetName="bd" Property="Opacity" Value="0.88"/>
+                      </Trigger>
+                      <DataTrigger Binding="{Binding ChainEnabled}" Value="True">
+                        <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+                        <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                        <Setter TargetName="bd" Property="BorderThickness" Value="1.4"/>
+                        <Setter TargetName="glyph" Property="Text" Value="&#xE73E;"/>
+                        <Setter TargetName="glyph" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                        <Setter TargetName="lbl" Property="Text" Value="{l:T TunnelHub.WarpOn}"/>
+                        <Setter TargetName="lbl" Property="Foreground" Value="{DynamicResource TextBrush}"/> <!-- v0.4.56 — white on the soft accent pill in dark, ink in light -->
+                        <Setter TargetName="lbl" Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                      </DataTrigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </Button.Template>
+              </Button>
+            </Grid>
+            <TextBlock Text="{l:T Chain.Sub}" Style="{StaticResource Subtle}" FontSize="11.5" Margin="0,4,0,10" TextWrapping="Wrap"/>
+            <ComboBox SelectedIndex="{Binding ChainModeIndex}" HorizontalAlignment="Stretch" MaxWidth="520" HorizontalContentAlignment="Left">
+              <ComboBoxItem Content="{l:T Chain.Mode.Gaming}"/>
+              <ComboBoxItem Content="{l:T Chain.Mode.Exit}"/>
+              <ComboBoxItem Content="{l:T Chain.Mode.OverProxy}"/>
+              <ComboBoxItem Content="{l:T Chain.Mode.Psiphon}"/>
+              <ComboBoxItem Content="{l:T Chain.Mode.Aether}"/>
+            </ComboBox>
+            <TextBlock Text="{Binding ChainModeHint}" Style="{StaticResource Subtle}" FontSize="11" Margin="2,7,2,0" TextWrapping="Wrap"/>
+
+            <!-- WARP identity row (modes 0-2) -->
+            <StackPanel Visibility="{Binding ChainIsWarpMode, Converter={StaticResource BoolToVis}}" Margin="0,9,0,0">
+              <StackPanel Orientation="Horizontal" FlowDirection="LeftToRight">
+                <Border CornerRadius="8" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="9,4" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding ChainWarpStatus}" FontSize="11" FontFamily="{StaticResource LatinFont}" TextWrapping="NoWrap"/>
+                </Border>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <Button Command="{Binding CreateWarpIdentityCommand}" Padding="9,5" Margin="0,0,6,0" FontSize="11">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE895;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,7,0"/>
+                    <TextBlock Text="{l:T Chain.Warp.Create}" FontWeight="SemiBold"/>
+                  </StackPanel>
+                </Button>
+                <Button Command="{Binding ImportWarpIdentityCommand}" Style="{StaticResource GhostButton}" Padding="12,6" Margin="0,0,6,0" FontSize="11.5">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE8B5;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,7,0"/>
+                    <TextBlock Text="{l:T Chain.Warp.Import}" FontWeight="SemiBold"/>
+                  </StackPanel>
+                </Button>
+                <Button Command="{Binding ExportChainConfigCommand}" Style="{StaticResource GhostButton}" Padding="12,6" FontSize="11.5" ToolTip="{l:T Chain.Export.Tip}">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE898;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,7,0"/>
+                    <TextBlock Text="{l:T Chain.Export}" FontWeight="SemiBold"/>
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </StackPanel>
+
+            <!-- Psiphon row (mode 3) -->
+            <StackPanel Visibility="{Binding ChainIsPsiphon, Converter={StaticResource BoolToVis}}" Margin="0,9,0,0">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{l:T Chain.Psiphon.Port}" VerticalAlignment="Center" FontSize="11.5"/>
+                <TextBox Text="{Binding ChainPsiphonPort, UpdateSourceTrigger=PropertyChanged}" Width="92" Margin="8,0,0,0" VerticalAlignment="Center"
+                         FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight"/>
+              </StackPanel>
+              <TextBlock Text="{l:T Chain.Psiphon.Hint}" Style="{StaticResource Subtle}" FontSize="11" Margin="2,7,2,0" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <!-- Aether row (mode 4): points the chain at the Aether section's own SOCKS5 proxy -->
+            <StackPanel Visibility="{Binding ChainIsAether, Converter={StaticResource BoolToVis}}" Margin="0,9,0,0">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{l:T Chain.Aether.Port}" VerticalAlignment="Center" FontSize="11.5"/>
+                <TextBox Text="{Binding ChainAetherPort, UpdateSourceTrigger=PropertyChanged}" Width="92" Margin="8,0,0,0" VerticalAlignment="Center"
+                         FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight"/>
+              </StackPanel>
+              <TextBlock Text="{l:T Chain.Aether.Hint}" Style="{StaticResource Subtle}" FontSize="11" Margin="2,7,2,0" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <!-- engine-applicability warning -->
+            <TextBlock Text="{l:T Chain.NotApplicable}" Foreground="{DynamicResource WarningBrush}" FontSize="11.5" Margin="2,9,2,0" TextWrapping="Wrap"
+                       Visibility="{Binding ChainNotApplicable, Converter={StaticResource BoolToVis}}"/>
+        </StackPanel>
+      </Border>
+
+      <!-- ══════════ Aether section — its own violet identity ══════════ -->
+      <Border Style="{StaticResource Card}" Margin="0,10,0,0" Padding="16,12"
+              Visibility="{Binding TunnelsTabAetherPanel, Converter={StaticResource BoolToVis}}">
+        <StackPanel>
+            <!-- v0.4.50 — the hub header: Aether's own identity (violet + shimmer sweep). The connect button carries
+                 the state; pressing CONNECT while the engine is mid-flight asks first and offers the cut right inside
+                 the dialog («اول قطعش کن و گزینه قطع هم بزاره تو همون ارور»). -->
+            <Grid ClipToBounds="True">
+                <Border x:Name="AetherShine" Width="64" HorizontalAlignment="Left" IsHitTestVisible="False" Opacity="0.45"
+                        Background="{DynamicResource Accent2Brush}">
+                  <!-- v0.4.54 — accent2 follows the palette; the fade lives in an opacity mask -->
+                  <Border.OpacityMask>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                      <GradientStop Color="#00000000" Offset="0"/><GradientStop Color="#FFFFFFFF" Offset="0.5"/><GradientStop Color="#00000000" Offset="1"/>
+                    </LinearGradientBrush>
+                  </Border.OpacityMask>
+                </Border>
+              <Grid Margin="0,2,0,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                  <Border Width="26" Height="26" CornerRadius="8" Background="{DynamicResource AccentSoftBrush}">
+                    <!-- v0.4.56 — «لوگوی اتر تو حالت سفید دیده نمیشه»: the hardcoded violet chip swallowed the atom; it rides the accent now -->
+                    <c:MotionGlyph Key="Aether" Width="15" Height="15" IsActive="True" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource Accent2Brush}"/>
+                  </Border>
+                  <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="{l:T Aether.Title}" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/> <!-- v0.4.56 — «متن اتر باید سفید بشه» -->
+                  </StackPanel>
+                </StackPanel>
+                <Button Command="{Binding AetherToggleCommand}" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand" Focusable="False">
+                  <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                      <Border x:Name="bd" CornerRadius="10" Padding="11,5" Background="{StaticResource HubAetherBrush}">
+                        <StackPanel Orientation="Horizontal">
+                          <TextBlock x:Name="glyph" Text="&#xE768;" Style="{StaticResource Icon}" FontSize="13" Foreground="White" VerticalAlignment="Center"/>
+                          <TextBlock Text="{Binding AetherButtonText}" Foreground="White" FontSize="12.5" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="bd" Property="Opacity" Value="0.9"/>
+                        </Trigger>
+                        <DataTrigger Binding="{Binding AetherIsConnected}" Value="True">
+                          <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+                          <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource Accent2Brush}"/>
+                          <Setter TargetName="bd" Property="BorderThickness" Value="1.4"/>
+                          <Setter TargetName="glyph" Property="Text" Value="&#xE71A;"/>
+                          <Setter TargetName="glyph" Property="Foreground" Value="{DynamicResource Accent2Brush}"/>
+                        </DataTrigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Button.Template>
+                </Button>
+              </Grid>
+            </Grid>
+            <TextBlock Text="{l:T Aether.Sub}" Style="{StaticResource Subtle}" FontSize="11.5" Margin="0,4,0,8" TextWrapping="Wrap"/>
+
+          <!-- state line: engine presence, current state, the SOCKS address to point apps at -->
+          <StackPanel Orientation="Horizontal" FlowDirection="LeftToRight" Margin="0,0,0,8">
+            <Border CornerRadius="8" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="9,4" VerticalAlignment="Center">
+              <TextBlock Text="{Binding AetherStateText}" FontSize="11" FontFamily="{StaticResource LatinFont}" TextWrapping="NoWrap"/>
+            </Border>
+          </StackPanel>
+
+          <!-- one-click presets: GAMING first — the reason most users open this card -->
+          <TextBlock Text="{l:T Aether.Presets}" Style="{StaticResource Subtle}" FontSize="11.5" Margin="0,2,0,6"/>
+          <StackPanel Orientation="Horizontal">
+            <Button Command="{Binding AetherGamingPresetCommand}" Margin="0,0,6,0" FontSize="11" ToolTip="{l:T Aether.Preset.Gaming.Tip}">
+              <Button.Style>
+                <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsGamingPresetActive}" Value="True">
+                      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Button.Style>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE7FC;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,7,0" Foreground="{DynamicResource SuccessBrush}"/>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="&#xE73E;" Style="{StaticResource Icon}" FontSize="10.5" VerticalAlignment="Center" Margin="0,0,5,0"
+                             Visibility="{Binding IsGamingPresetActive, Converter={StaticResource BoolToVis}}"/>
+                  <TextBlock Text="{l:T Aether.Preset.Gaming}" FontWeight="SemiBold"/>
+                </StackPanel>
+              </StackPanel>
+            </Button>
+            <Button Command="{Binding AetherStealthPresetCommand}" Padding="9,5" Margin="0,0,6,0" FontSize="11" ToolTip="{l:T Aether.Preset.Stealth.Tip}">
+              <Button.Style>
+                <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsStealthPresetActive}" Value="True">
+                      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Button.Style>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE72E;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,7,0"/>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="&#xE73E;" Style="{StaticResource Icon}" FontSize="10.5" VerticalAlignment="Center" Margin="0,0,5,0"
+                             Visibility="{Binding IsStealthPresetActive, Converter={StaticResource BoolToVis}}"/>
+                  <TextBlock Text="{l:T Aether.Preset.Stealth}" FontWeight="SemiBold"/>
+                </StackPanel>
+              </StackPanel>
+            </Button>
+            <Button Command="{Binding AetherDefaultPresetCommand}" Padding="9,5" FontSize="11" ToolTip="{l:T Aether.Preset.Default.Tip}">
+              <Button.Style>
+                <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsDefaultPresetActive}" Value="True">
+                      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Button.Style>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE7B7;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,7,0"/>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="&#xE73E;" Style="{StaticResource Icon}" FontSize="10.5" VerticalAlignment="Center" Margin="0,0,5,0"
+                             Visibility="{Binding IsDefaultPresetActive, Converter={StaticResource BoolToVis}}"/>
+                  <TextBlock Text="{l:T Aether.Preset.Default}" FontWeight="SemiBold"/>
+                </StackPanel>
+              </StackPanel>
+            </Button>
+          </StackPanel>
+          <!-- the gaming cheat-sheet: what each option means FOR GAMES, right where the buttons are -->
+          <Border Background="{DynamicResource SuccessSoftBrush}" CornerRadius="8" Padding="10,8" Margin="0,8,0,0">
+            <TextBlock Text="{l:T Aether.GamingTip}" FontSize="11" TextWrapping="Wrap" LineHeight="18"/>
+          </Border>
+
+          <Separator Background="{DynamicResource BorderBrush}" Margin="0,10,0,8"/>
+
+          <!-- advanced panel: every Aether core option, mirroring Aether-GUI's Advanced panel -->
+          <Expander Header="{l:T Aether.Advanced}" FontSize="12" IsExpanded="False">
+            <StackPanel Margin="0,8,0,0">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                  <RowDefinition/><RowDefinition/><RowDefinition/>
+                </Grid.RowDefinitions>
+
+                <!-- protocol -->
+                <StackPanel Grid.Row="0" Grid.Column="0">
+                  <TextBlock Text="{l:T Aether.Protocol}" Style="{StaticResource Subtle}" FontSize="11"/>
+                  <ComboBox SelectedIndex="{Binding AetherProtocolIndex}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,3,0,8">
+                    <ComboBoxItem Content="{l:T Aether.Protocol.Auto}"/>
+                    <ComboBoxItem Content="{l:T Aether.Protocol.Masque}"/>
+                    <ComboBoxItem Content="{l:T Aether.Protocol.Wireguard}"/>
+                    <ComboBoxItem Content="{l:T Aether.Protocol.Gool}"/>
+                    <ComboBoxItem Content="{l:T Aether.Protocol.Mim}"/>
+                  </ComboBox>
+                </StackPanel>
+                <!-- scan mode -->
+                <StackPanel Grid.Row="0" Grid.Column="2">
+                  <TextBlock Text="{l:T Aether.Scan}" Style="{StaticResource Subtle}" FontSize="11"/>
+                  <ComboBox SelectedIndex="{Binding AetherScanIndex}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,3,0,8">
+                    <ComboBoxItem Content="{l:T Aether.Scan.Turbo}"/>
+                    <ComboBoxItem Content="{l:T Aether.Scan.Balanced}"/>
+                    <ComboBoxItem Content="{l:T Aether.Scan.Thorough}"/>
+                    <ComboBoxItem Content="{l:T Aether.Scan.Verified}"/>
+                    <ComboBoxItem Content="{l:T Aether.Scan.Ironclad}"/>
+                  </ComboBox>
+                </StackPanel>
+                <!-- ip version -->
+                <StackPanel Grid.Row="1" Grid.Column="0">
+                  <TextBlock Text="{l:T Aether.IpVersion}" Style="{StaticResource Subtle}" FontSize="11"/>
+                  <ComboBox SelectedIndex="{Binding AetherIpIndex}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,3,0,8">
+                    <ComboBoxItem Content="{l:T Aether.Ip.V4}"/>
+                    <ComboBoxItem Content="{l:T Aether.Ip.V6}"/>
+                    <ComboBoxItem Content="{l:T Aether.Ip.Both}"/>
+                  </ComboBox>
+                </StackPanel>
+                <!-- network overlay (Tor/Psiphon) -->
+                <StackPanel Grid.Row="1" Grid.Column="2">
+                  <TextBlock Text="{l:T Aether.Network}" Style="{StaticResource Subtle}" FontSize="11"/>
+                  <ComboBox SelectedIndex="{Binding AetherNetworkIndex}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,3,0,8">
+                    <ComboBoxItem Content="{l:T Aether.Net.Warp}"/>
+                    <ComboBoxItem Content="{l:T Aether.Net.PsiphonOnly}"/>
+                    <ComboBoxItem Content="{l:T Aether.Net.TorOnly}"/>
+                    <ComboBoxItem Content="{l:T Aether.Net.PsiphonChain}"/>
+                    <ComboBoxItem Content="{l:T Aether.Net.TorChain}"/>
+                    <ComboBoxItem Content="{l:T Aether.Net.PsiphonReverse}"/>
+                    <ComboBoxItem Content="{l:T Aether.Net.TorReverse}"/>
+                  </ComboBox>
+                </StackPanel>
+                <!-- obfuscation (MASQUE family) -->
+                <StackPanel Grid.Row="2" Grid.Column="0">
+                  <TextBlock Text="{l:T Aether.MasqueNoize}" Style="{StaticResource Subtle}" FontSize="11"/>
+                  <ComboBox SelectedIndex="{Binding AetherMasqueNoizeIndex}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,3,0,8">
+                    <ComboBoxItem Content="{l:T Aether.Noize.Firewall}"/>
+                    <ComboBoxItem Content="{l:T Aether.Noize.Gfw}"/>
+                    <ComboBoxItem Content="{l:T Aether.Noize.Off}"/>
+                  </ComboBox>
+                </StackPanel>
+                <!-- obfuscation (WireGuard/gool family) -->
+                <StackPanel Grid.Row="2" Grid.Column="2">
+                  <TextBlock Text="{l:T Aether.WgNoize}" Style="{StaticResource Subtle}" FontSize="11"/>
+                  <ComboBox SelectedIndex="{Binding AetherWgNoizeIndex}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,3,0,8">
+                    <ComboBoxItem Content="{l:T Aether.Noize.Balanced}"/>
+                    <ComboBoxItem Content="{l:T Aether.Noize.Aggressive}"/>
+                    <ComboBoxItem Content="{l:T Aether.Noize.Light}"/>
+                    <ComboBoxItem Content="{l:T Aether.Noize.Off}"/>
+                  </ComboBox>
+                </StackPanel>
+              </Grid>
+
+              <!-- toggles row -->
+              <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding AetherQuickReconnect}" Content="{l:T Aether.QuickReconnect}" Margin="0,0,16,0" FontSize="11.5"/>
+                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding AetherMasqueHttp2}" Content="{l:T Aether.Http2}" Margin="0,0,16,0" FontSize="11.5"/>
+                <!-- v0.4.49 — the toggle now runs the split-aware session (تونل‌زنی rules apply); the tip says so. -->
+                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding AetherSystemProxy}" Content="{l:T Aether.SysProxy}"
+                          ToolTip="{l:T Aether.SysProxy.Tip}" FontSize="11.5"/>
+              </StackPanel>
+
+              <!-- address rows: two label+box rows, each followed by its hint on its own line — a plain
+                   2-column form (like the Zero Trust area). The earlier 8-column grid put the labels of
+                   'زنجیره به بالا'/'کشور خروجی' inside 8px spacer columns, wrapping them one character
+                   per line (field-report screenshot 1794777300408). -->
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/><ColumnDefinition Width="10"/><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                  <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:T Aether.Bind}" VerticalAlignment="Center" FontSize="11.5"/>
+                <TextBox Grid.Row="0" Grid.Column="2" Text="{Binding AetherBind, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
+                         FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight"/>
+                <TextBlock Grid.Row="0" Grid.Column="3" Text="{l:T Aether.Bind.Tip}" Style="{StaticResource Subtle}" FontSize="10.5" VerticalAlignment="Center" Margin="8,0,0,0" TextWrapping="Wrap"/>
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="{l:T Aether.HttpProxy}" VerticalAlignment="Center" FontSize="11.5"/>
+                <TextBox Grid.Row="2" Grid.Column="2" Text="{Binding AetherHttpProxy, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
+                         FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight"/>
+                <TextBlock Grid.Row="2" Grid.Column="3" Text="{l:T Aether.HttpProxy.Tip}" Style="{StaticResource Subtle}" FontSize="10.5" VerticalAlignment="Center" Margin="8,0,0,0" TextWrapping="Wrap"/>
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="{l:T Aether.Upstream}" VerticalAlignment="Center" FontSize="11.5"/>
+                <TextBox Grid.Row="3" Grid.Column="2" Text="{Binding AetherUpstream, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
+                         FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight"/>
+                <TextBlock Grid.Row="3" Grid.Column="3" Text="{l:T Aether.Upstream.Tip}" Style="{StaticResource Subtle}" FontSize="10.5" VerticalAlignment="Center" Margin="8,0,0,0" TextWrapping="Wrap"/>
+              </Grid>
+              <!-- 'کشور خروجی' gets its own row: a country code like '!IR,DE' is short, but the label
+                   needs real width — never a spacer column. -->
+              <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/><ColumnDefinition Width="10"/><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{l:T Aether.ExitLoc}" VerticalAlignment="Center" FontSize="11.5"/>
+                <TextBox Grid.Column="2" Text="{Binding AetherExitLoc, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Width="120" HorizontalAlignment="Left"
+                         FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight"/>
+                <TextBlock Grid.Column="3" Text="{l:T Aether.ExitLoc.Tip}" Style="{StaticResource Subtle}" FontSize="10.5" VerticalAlignment="Center" Margin="8,0,0,0" TextWrapping="Wrap"/>
+              </Grid>
+
+              <!-- Zero Trust (Cloudflare teams) -->
+              <Expander Header="{l:T Aether.ZT}" FontSize="11.5" Margin="0,8,0,0" IsExpanded="False">
+                <StackPanel Margin="0,6,0,0">
+                  <TextBlock Text="{l:T Aether.ZT.Hint}" Style="{StaticResource Subtle}" FontSize="10.5" TextWrapping="Wrap"/>
+                  <TextBox Text="{Binding AetherZtTeam, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,6" VerticalAlignment="Center"
+                           FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight" Tag="{l:T Aether.ZT.Team}"/>
+                  <ComboBox SelectedIndex="{Binding AetherZtAuthIndex}" HorizontalAlignment="Stretch" MaxWidth="360" HorizontalContentAlignment="Left" Margin="0,0,0,6">
+                    <ComboBoxItem Content="{l:T Aether.ZT.Email}"/>
+                    <ComboBoxItem Content="{l:T Aether.ZT.Service}"/>
+                    <ComboBoxItem Content="{l:T Aether.ZT.Token}"/>
+                  </ComboBox>
+                  <TextBox Text="{Binding AetherZtEmail, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,6" VerticalAlignment="Center"
+                           FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight" Tag="{l:T Aether.ZT.Email}" ToolTip="{l:T Aether.ZT.Email}"/>
+                  <TextBox Text="{Binding AetherZtClientId, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,6" VerticalAlignment="Center"
+                           FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight" Tag="{l:T Aether.ZT.ClientId}" ToolTip="{l:T Aether.ZT.ClientId}"/>
+                  <TextBox Text="{Binding AetherZtSecret, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,6" VerticalAlignment="Center"
+                           FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight" Tag="{l:T Aether.ZT.Secret}" ToolTip="{l:T Aether.ZT.Secret}"/>
+                  <TextBox Text="{Binding AetherZtToken, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource LatinFont}" FlowDirection="LeftToRight"
+                           Tag="{l:T Aether.ZT.Token}" ToolTip="{l:T Aether.ZT.Token}"/>
+                  <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding AetherZtGateway}" Content="{l:T Aether.ZT.Gateway}" Margin="0,8,0,0" FontSize="11.5"/>
+                </StackPanel>
+              </Expander>
+            </StackPanel>
+          </Expander>
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

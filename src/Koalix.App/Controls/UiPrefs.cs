@@ -13,10 +13,23 @@ namespace Koalix.App.Controls;
 public static class UiPrefs
 {
     private const string Key = "ui.connectShape";
+    private const string MotionKey = "ui.connectMotion";
     private static bool _loaded;
     private static bool _circle;
+    private static string _shape = "rounded";
+    private static string _motion = "water";
 
-    /// <summary>True → the big connect button renders as a circle (the pre-0.4.13 orb); false → rounded square (default).</summary>
+    /// <summary>v0.4.54 — «شکل دکمه اتصال هم چند مدل کن»: rounded (default), circle, hex, shield, diamond.</summary>
+    public static string Shape
+    {
+        get
+        {
+            if (!_loaded) Load();
+            return _shape;
+        }
+    }
+
+    /// <summary>True → the big connect button renders as a circle (the pre-0.4.13 orb); kept for older callers.</summary>
     public static bool CircleConnect
     {
         get
@@ -26,22 +39,44 @@ public static class UiPrefs
         }
     }
 
-    /// <summary>Raised after <see cref="Set"/> flips the shape.</summary>
+    /// <summary>v0.4.54 — «داخلش انیمیشن و متحرک بودنش هم چن مدل بکن بشه انتخاب کرد»: the liquid inside the core —
+    /// water (the floating waves), breathe (the aura breathes), pulse (fast rings), orbit (two riders circling), none.</summary>
+    public static string Motion
+    {
+        get
+        {
+            if (!_loaded) Load();
+            return _motion;
+        }
+    }
+
+    /// <summary>Raised after <see cref="Set"/> flips the shape or the motion.</summary>
     public static event Action? Changed;
 
     private static void Load()
     {
         _loaded = true;
-        try { _circle = AppHost.Get<SettingsRepository>().Get(Key) == "circle"; }
-        catch { /* DI not ready yet (design time) — stay on the default rounded square. */ }
+        try
+        {
+            _shape = AppHost.Get<SettingsRepository>().Get(Key) is { Length: > 0 } s && s is "circle" or "hex" or "shield" or "diamond" ? s : "rounded";
+            _circle = _shape == "circle";
+            _motion = AppHost.Get<SettingsRepository>().Get(MotionKey) is { Length: > 0 } m && m is "breathe" or "pulse" or "orbit" or "none" or "heartbeat" or "tide" or "storm" or "galaxy" or "vortex" ? m : "water"; // v0.4.56 — +5 motions
+        }
+        catch { /* DI not ready yet (design time) — stay on the defaults. */ }
     }
 
-    /// <summary>Called by SettingsViewModel when the user picks a shape; persists nothing (the VM owns storage).</summary>
+    /// <summary>Called by SettingsViewModel when the user picks a shape/motion; persists nothing (the VM owns storage).</summary>
     public static void Set(bool circle)
     {
+        Set(circle ? "circle" : "rounded", Motion);
+    }
+
+    public static void Set(string shape, string motion)
+    {
         if (!_loaded) Load();
-        if (_circle == circle) return;
-        _circle = circle;
-        Changed?.Invoke();
+        var changed = false;
+        if (_shape != shape) { _shape = shape; _circle = shape == "circle"; changed = true; }
+        if (_motion != motion) { _motion = motion; changed = true; }
+        if (changed) Changed?.Invoke();
     }
 }

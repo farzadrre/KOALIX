@@ -610,8 +610,10 @@ public sealed partial class WorldMap : FrameworkElement
                 dc.DrawGeometry(null, meshPen, g);
             }
 
-            // Preview route to hovered or selected country (when different from active)
-            var previewPin = externalHover ?? selected;
+            // Preview route to hovered or selected country (when different from active).
+            // v0.4.50 («سرور قبلی سلکت شده ها») — the route used to prefer a lingering HOVER over the actual
+            // selection, so the dashed "IR ➔ …" badge stayed on the previous country. Selection leads now.
+            var previewPin = selected ?? externalHover;
             if (previewPin is not null && !ReferenceEquals(previewPin, active) && (previewPin.At - h0).Length > 4)
             {
                 var prevBadge = previewPin.Row.Best.Length > 0

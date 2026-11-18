@@ -77,8 +77,8 @@ public sealed partial class GuideViewModel : PageViewModel
 
         Lessons.Add(new GuideTopic("AddConfig", "\uE71B", run: () => _dash.OpenAddConfigCommand.Execute(null)));
         Lessons.Add(new GuideTopic("Connect", "\uE7E8", run: () => Go("Nav.Dashboard")));
-        Lessons.Add(new GuideTopic("Aether", "\uE968", run: () => Go("Nav.Dashboard"))); // v0.4.48 — the Aether tunnel section
-        Lessons.Add(new GuideTopic("AetherGaming", "\uE7FC", advanced: true, run: () => Go("Nav.Dashboard"))); // v0.4.48 — which options are the gaming ones
+        Lessons.Add(new GuideTopic("Aether", "\uE968", run: () => Go("Nav.TunnelHub"))); // v0.4.56 — «تو قسمت اموزش اتر بگو که جاش اومده توی مدار ها»: the card lives in the Tunnels hub, not the dashboard
+        Lessons.Add(new GuideTopic("AetherGaming", "\uE7FC", advanced: true, run: () => Go("Nav.TunnelHub"))); // v0.4.56 — same target
         Lessons.Add(new GuideTopic("Ping", "\uEC05"));
         Lessons.Add(new GuideTopic("Subs", "\uE753", run: () => Go("Nav.Profiles")));
         Lessons.Add(new GuideTopic("Split", "\uE8AB", run: () => Go("Nav.Split")));

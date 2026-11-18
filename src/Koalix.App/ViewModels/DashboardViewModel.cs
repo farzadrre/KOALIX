@@ -374,17 +374,57 @@ public sealed partial class DashboardViewModel : PageViewModel
         };
     }
 
+    /// <summary>v0.4.53 — «همچنان رو نشون دادن سروری که سلکته مشکل داره»: the highlight used to sit on whatever
+    /// was last clicked — while the banner names the AUTO row's current pick, so the glowing card and the named
+    /// server disagreed. The highlight now ALWAYS rides the server the banner names (manual pick, or the auto
+    /// pick while AUTO is selected); the AUTO row itself never glows.</summary>
+    private void SyncPickHighlight()
+    {
+        // v0.4.54 — «انگار کل کانفیگا انتخاب شدن»: matching by NAME lit every same-named row; matching by PROFILE
+        // ID fixed that. v0.4.55 — «چن تاشون شکلاشون عوض میشن»: multi-config entries (an .ovpn bundle unpacked
+        // into «OpenVpn (۲)/(۳)»…) are SEPARATE rows sharing ONE TunnelProfile, so the id match still lit them
+        // ALL. The match is now (profile ENTITY + exact title) — the (۲)/(۳) siblings have different titles, so
+        // exactly the picked card glows; the auto pick resolves its entity+title from the banner's name first.
+        TunnelProfile? ent = null;
+        string title = "";
+        if (SelectedProfile is { IsAuto: true })
+        {
+            var pick = _autoRow?.AutoPick ?? "";
+            if (pick.Length > 0)
+            {
+                var src = _allRows.FirstOrDefault(r => !r.IsAuto && r.Name == pick) ?? Profiles.FirstOrDefault(r => !r.IsAuto && r.Name == pick);
+                ent = src?.Profile; title = pick;
+            }
+        }
+        else
+        {
+            ent = SelectedProfile?.Profile; title = SelectedProfile?.Name ?? "";
+        }
+        bool Match(ProfileRow r) => ent is not null && ReferenceEquals(r.Profile, ent) && r.Name == title;
+        foreach (var r in _allRows) r.IsSelected = Match(r);
+        foreach (var r in Profiles) r.IsSelected = Match(r);
+        if (_autoRow is not null) _autoRow.IsSelected = false;
+    }
+
     partial void OnSelectedProfileChanged(ProfileRow? value)
     {
-        foreach (var r in Profiles) r.IsSelected = r == value;
+        // v0.4.50 («سرور قبلی سلکت شده ها») — sync EVERY row instance: picker rows, group-filtered cards and
+        // _allRows are shared objects, but a pick outside the current group filter lives only in _allRows.
+        SyncPickHighlight(); // v0.4.53 — «همچنان رو نشون دادن سروری که سلکته مشکل داره»: highlight = the banner's name
         SyncCountryStates();
         OnPropertyChanged(nameof(ChainApplicable)); // v0.4.47 — chain only applies to sing-box/Xray profiles
         UpdateHero();
+        // v0.4.51 («وقتی از اپ میریم بیرون و میایم داخل اخرین سروری که سلکت بودیم هنوزم سلکت باشه») — the pick
+        // persists as conn.selected and comes back on the next cold start. The auto row persists as "".
+        try { _settings.Set("conn.selected", value?.Profile is { } picked ? picked.Id.ToString() : ""); } catch { }
     }
 
     public override void OnActivated()
     {
-        var sel = SelectedProfile?.Profile?.Id;
+        // v0.4.51 — cold start restores the last picked server (conn.selected) BEFORE the sort, so the dashboard
+        // opens with the SAME server highlighted as when the app was closed. Auto mode still overrides it (explicit choice).
+        long? savedSel = long.TryParse(_settings.Get("conn.selected"), out var sid) ? sid : null;
+        var sel = SelectedProfile?.Profile?.Id ?? savedSel;
         var autoWanted = _settings.Get("conn.auto") == "1";
         // v0.4.19: the chosen sort mode persists ("dash.sort"); Ping stays the shipped default.
         var savedSort = _settings.Get("dash.sort");
@@ -423,6 +463,7 @@ public sealed partial class DashboardViewModel : PageViewModel
         if (_autoRow is null) return;
         var pick = BestProfile()?.Name ?? "";
         _autoRow.SetAutoTexts(L["Auto.Title"], pick.Length > 0 ? L.Format("Auto.SubPick", pick) : L["Auto.Sub"], pick);
+        if (SelectedProfile is { IsAuto: true }) SyncPickHighlight(); // v0.4.53 — the highlight rides the auto pick
     }
 
     /// <summary>
@@ -654,6 +695,7 @@ public sealed partial class DashboardViewModel : PageViewModel
             Profiles.Add(r);
         }
         SelectedProfile = Profiles.FirstOrDefault(r => !r.IsAuto && r.Profile?.Id == keepId)
+            ?? _allRows.FirstOrDefault(r => !r.IsAuto && r.Profile?.Id == keepId)
             ?? (autoWasSelected && auto is not null ? auto : Profiles.FirstOrDefault(r => !r.IsAuto));
     }
 
@@ -746,6 +788,7 @@ public sealed partial class DashboardViewModel : PageViewModel
         var wasUp = State is ConnectionState.Connected or ConnectionState.Degraded;
         State = c.To;
         OnPropertyChanged(nameof(IsConnected));
+        RaiseTunnelBanner(); // v0.4.50 — the dashboard's «تونل متصل است» banner follows the live state
         OnPropertyChanged(nameof(AutoOn));
         OnPropertyChanged(nameof(CanRescue));
         ConnectCommand.NotifyCanExecuteChanged();
@@ -882,7 +925,10 @@ public sealed partial class DashboardViewModel : PageViewModel
     public async Task ConnectToAsync(TunnelProfile profile)
     {
         if (_cm.Active?.Profile.Id == profile.Id) { await _cm.DisconnectAsync(CancellationToken.None); return; }
-        SelectedProfile = Profiles.FirstOrDefault(r => r.Profile?.Id == profile.Id);
+        // v0.4.50 — resolve against ALL rows: the picked server can live outside the current group filter,
+        // where Profiles.FirstOrDefault returned null and left the map with no highlight at all.
+        SelectedProfile = Profiles.FirstOrDefault(r => r.Profile?.Id == profile.Id)
+            ?? _allRows.FirstOrDefault(r => r.Profile?.Id == profile.Id);
         _settings.Set("conn.auto", "0"); // an explicit server pick is a manual decision (v0.4.6)
         await StartConnectAsync(profile);
     }
@@ -900,6 +946,15 @@ public sealed partial class DashboardViewModel : PageViewModel
 
     private async Task StartConnectAsync(TunnelProfile profile)
     {
+        // v0.4.50 («وقتی دکمه اتصال و میزنیم بگه که اول قطعش کن و گزینه قطع هم بزاره تو همون ارور») — the connect
+        // button no longer ignores a live Aether: it explains, and the disconnect action sits INSIDE the dialog.
+        if (_aether is { IsConnected: true })
+        {
+            if (!Services.Dialogs.ConfirmCustom(L["Aether.Up.Title"], L["Aether.Up.Msg"], L["Aether.Up.Disconnect"], L["Common.Cancel"], dangerous: true)) return;
+            await _aether.DisconnectAsync();
+        }
+        TunnelGeo = null; // v0.4.50 («سرور قبلی سلکت شده ها») — stop advertising the previous exit as live the moment a new connect starts
+        SyncCountryStates();
         if (!ProcessRunner.IsElevated)
         {
             if (Services.Dialogs.Confirm(L["Admin.Title"], L["Admin.TunNeedsAdmin"])) { if (ProcessRunner.RestartElevated()) { App.Current.ReleaseSingleInstance(); App.Current.Shutdown(); } }
@@ -1176,7 +1231,7 @@ public sealed partial class DashboardViewModel : PageViewModel
     /// <summary>Every pill click opens its panel — even a re-click on the active pill after «بستن», which no
     /// IsChecked change would report. Setting TunnelsPanelOpen raises the panel flags when it flips; the
     /// unconditional re-raise covers the generator's no-change skip.</summary>
-    private void OpenTunnelsPanel()
+    public void OpenTunnelsPanel()
     {
         TunnelsPanelOpen = true;          // false→true fires OnTunnelsPanelOpenChanged → flags refresh
         OnPropertyChanged(nameof(TunnelsTabChainPanel));   // re-raise even when the generator skipped
@@ -1204,6 +1259,38 @@ public sealed partial class DashboardViewModel : PageViewModel
     /// <summary>Fold the advanced-tunnels card back to its tab strip (the «بستن» button).</summary>
     [RelayCommand]
     private void TunnelsClose() => TunnelsPanelOpen = false;
+
+    // ─── v0.4.50 — the tunnels live on their own page now; the dashboard only REPORTS them ───
+    // (user: «وقتی aether وصله و تو داشبورد میرم بنویسه که این وصله و نزاره دکمه اتصال و بزنیم»)
+    public bool TunnelBannerVisible => IsConnected || AetherIsConnected;
+    public string TunnelBannerText
+    {
+        get
+        {
+            var parts = new List<string>(2);
+            if (IsConnected) parts.Add(L["Dash.Banner.Tunnel"]);
+            if (AetherIsConnected) parts.Add(L["Dash.Banner.Aether"]);
+            return string.Join(" · ", parts);
+        }
+    }
+
+    private void RaiseTunnelBanner()
+    {
+        OnPropertyChanged(nameof(TunnelBannerVisible));
+        OnPropertyChanged(nameof(TunnelBannerText));
+    }
+
+    /// <summary>Dashboard banner → the tunnels page: one click from «متصل است» to the tunnel's own controls.</summary>
+    [RelayCommand]
+    private void OpenTunnelsHub()
+    {
+        var main = AppHost.Get<MainViewModel>();
+        main.Selected = main.Nav.First(n => n.Page is TunnelsHubViewModel); // v0.4.54 — find the circuits row by ITS VM (the nav keys swapped)
+    }
+
+    /// <summary>The hub's big WARP action button: the ChainEnabled switch styled as the tunnel's own button.</summary>
+    [RelayCommand]
+    private void ChainToggle() => ChainEnabled = !ChainEnabled;
 
     [ObservableProperty] private bool _chainEnabled;
     /// <summary>0 = WARP gaming (UDP→WARP, TCP→config), 1 = WARP exit, 2 = WARP over the config, 3 = Psiphon (local SOCKS).</summary>
@@ -1312,10 +1399,15 @@ public sealed partial class DashboardViewModel : PageViewModel
         L.LanguageChanged += () => Ui(RefreshAetherState);
     }
 
+    /// <summary>v0.4.50 — live Aether-up flag: the dashboard banner and the hub pill's state dot read it.</summary>
+    [ObservableProperty] private bool _aetherIsConnected;
+    partial void OnAetherIsConnectedChanged(bool value) => RaiseTunnelBanner();
+
     /// <summary>The card's state line: engine presence + lifecycle state + the SOCKS address to point apps at.</summary>
     private void RefreshAetherState()
     {
         var state = _aether.Engine.State;
+        AetherIsConnected = _aether is { IsConnected: true };
         var engine = _aether.FindEngine() is null ? "✗ " + L["Aether.EngineMissing"] : "✓ " + L["Aether.EngineReady"];
         var st = state switch
         {
@@ -1340,8 +1432,17 @@ public sealed partial class DashboardViewModel : PageViewModel
         AetherBusy = true;
         try
         {
-            if (_aether is { IsConnected: true } or { Engine.State: Koalix.Aether.AetherState.Launching or Koalix.Aether.AetherState.Connecting or Koalix.Aether.AetherState.Reconnecting })
+            if (_aether.IsConnected)
+            {
+                // v0.4.50 — the button reads «قطع» while up: a plain toggle, no nagging.
                 await _aether.DisconnectAsync();
+            }
+            else if (_aether.Engine.State is Koalix.Aether.AetherState.Launching or Koalix.Aether.AetherState.Connecting or Koalix.Aether.AetherState.Reconnecting)
+            {
+                // v0.4.50 — pressing CONNECT mid-flight no longer silently disconnects: it explains and offers the cut.
+                if (Services.Dialogs.ConfirmCustom(L["Aether.Busy.Title"], L["Aether.Busy.Msg"], L["Aether.Busy.Disconnect"], L["Common.Cancel"], dangerous: true))
+                    await _aether.DisconnectAsync();
+            }
             else
                 await _aether.ConnectAsync(null, CancellationToken.None);
         }
@@ -1358,9 +1459,24 @@ public sealed partial class DashboardViewModel : PageViewModel
         finally { AetherBusy = false; RefreshAetherState(); }
     }
 
-    [RelayCommand] private void AetherGamingPreset() { _aether.ApplyGamingPreset(); InitAether(); Toasts.Show(L["Aether.Title"], L["Aether.Preset.Gaming.Done"], ToastKind.Success); }
-    [RelayCommand] private void AetherStealthPreset() { _aether.ApplyStealthPreset(); InitAether(); Toasts.Show(L["Aether.Title"], L["Aether.Preset.Stealth.Done"], ToastKind.Success); }
-    [RelayCommand] private void AetherDefaultPreset() { _aether.ApplyDefaultPreset(); InitAether(); Toasts.Show(L["Aether.Title"], L["Aether.Preset.Default.Done"], ToastKind.Success); }
+    // v0.4.53 — «روی گیم فقط نشون میده سلکته .. رو گزینه های دیگه بزنیم اعمال میشه ولی نشونش نمیده»: the presets
+    // were one-shot commands (and گیم was accent-styled FOREVER, reading as always-selected). Now the applied
+    // preset is tracked (persisted as aether.preset) and all three buttons show their own active state.
+    [ObservableProperty] private string _aetherActivePreset = "";
+    public bool IsGamingPresetActive => AetherActivePreset == "gaming";
+    public bool IsStealthPresetActive => AetherActivePreset == "stealth";
+    public bool IsDefaultPresetActive => AetherActivePreset == "default";
+    partial void OnAetherActivePresetChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsGamingPresetActive));
+        OnPropertyChanged(nameof(IsStealthPresetActive));
+        OnPropertyChanged(nameof(IsDefaultPresetActive));
+        try { _settings.Set("aether.preset", value); } catch { }
+    }
+
+    [RelayCommand] private void AetherGamingPreset() { _aether.ApplyGamingPreset(); AetherActivePreset = "gaming"; InitAether(); Toasts.Show(L["Aether.Title"], L["Aether.Preset.Gaming.Done"], ToastKind.Success); }
+    [RelayCommand] private void AetherStealthPreset() { _aether.ApplyStealthPreset(); AetherActivePreset = "stealth"; InitAether(); Toasts.Show(L["Aether.Title"], L["Aether.Preset.Stealth.Done"], ToastKind.Success); }
+    [RelayCommand] private void AetherDefaultPreset() { _aether.ApplyDefaultPreset(); AetherActivePreset = "default"; InitAether(); Toasts.Show(L["Aether.Title"], L["Aether.Preset.Default.Done"], ToastKind.Success); }
 
     // settings write-backs (guarded, like the chain card)
     partial void OnAetherProtocolIndexChanged(int value) { if (!_syncAether) _settings.Set("aether.protocol", value switch { 1 => "Masque", 2 => "Wireguard", 3 => "Gool", 4 => "Mim", _ => "Auto" }); }

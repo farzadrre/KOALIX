@@ -151,7 +151,10 @@ public sealed class SectionEmblem : Viewbox
     private (FrameworkElement, Storyboard) Arrows()
     {
         const double w = 168, h = 36;
-        var canvas = new Canvas { Width = w, Height = h };
+        // v0.4.50 (tour bug: «یک خط سبز روی فلش هاست») — two fixes: the canvas CLIPS its content (the arrows used
+        // to spill outside the emblem box), and it forces LTR so the RTL window mirror cannot flip the canvas
+        // while the RenderTransform translations stay unmirrored (the two arrows could end up crossing).
+        var canvas = new Canvas { Width = w, Height = h, ClipToBounds = true, FlowDirection = FlowDirection.LeftToRight };
 
         // → arrow (tunnel direction) shuttles right and back; ← arrow mirrors it with opposite phase.
         // Both arrows carry a TransformGroup(flip?, translate) — the animation drives the group's TranslateTransform.
@@ -162,8 +165,8 @@ public sealed class SectionEmblem : Viewbox
 
         Storyboard sb = new() { RepeatBehavior = RepeatBehavior.Forever };
         // gentle shuttling, opposite phases — "packets deciding which way to go"
-        var ra = new DoubleAnimation(8, 30, TimeSpan.FromSeconds(1.15)) { AutoReverse = true, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }, RepeatBehavior = RepeatBehavior.Forever };
-        var la = new DoubleAnimation(96, 74, TimeSpan.FromSeconds(1.15)) { AutoReverse = true, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }, RepeatBehavior = RepeatBehavior.Forever };
+        var ra = new DoubleAnimation(4, 26, TimeSpan.FromSeconds(1.15)) { AutoReverse = true, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }, RepeatBehavior = RepeatBehavior.Forever };
+        var la = new DoubleAnimation(112, 92, TimeSpan.FromSeconds(1.15)) { AutoReverse = true, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }, RepeatBehavior = RepeatBehavior.Forever };
         Target(ra, "(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)"); Storyboard.SetTarget(ra, right);
         Target(la, "(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)"); Storyboard.SetTarget(la, left);
         sb.Children.Add(ra); sb.Children.Add(la);

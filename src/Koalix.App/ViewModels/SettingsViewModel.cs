@@ -98,8 +98,16 @@ public sealed partial class SettingsViewModel : PageViewModel
     public bool OpenVpnInstalled => Koalix.Tunneling.EnginePaths.OpenVpnExe is not null;
     public const string OpenVpnDownloadUrl = "https://openvpn.net/community-downloads/";
     // v0.4.14: connect-button shape — "rounded" (the 0.4.13 tile) or "circle" (the classic orb).
-    public IReadOnlyList<string> ConnectShapes { get; } = ["rounded", "circle"];
+    public IReadOnlyList<string> ConnectShapes { get; } = ["rounded", "circle", "hex", "shield", "diamond"]; // v0.4.54
     [ObservableProperty] private string _connectShape = "rounded";
+    // v0.4.54 — «داخلش انیمیشن و متحرک بودنش هم چن مدل بکن بشه انتخاب کرد»
+    public IReadOnlyList<string> ConnectMotions { get; } = ["water", "heartbeat", "tide", "storm", "galaxy", "vortex", "breathe", "pulse", "orbit", "none"]; // v0.4.56 — «انیمیشن بیشتر بیار ۵ تا دیگه»
+    [ObservableProperty] private string _connectMotion = "water";
+    partial void OnConnectMotionChanged(string value)
+    {
+        try { _s.Set("ui.connectMotion", value); } catch { }
+        Controls.UiPrefs.Set(ConnectShape, value);
+    }
     [ObservableProperty] private bool _strictRoute = true;
     [ObservableProperty] private bool _useWireSock;
     public bool WireSockInstalled => Koalix.Tunneling.EnginePaths.WireSockExe is not null;
@@ -116,6 +124,20 @@ public sealed partial class SettingsViewModel : PageViewModel
     [ObservableProperty] private string _language;
     [ObservableProperty] private AppTheme _theme2;
     [ObservableProperty] private Backdrop _backdrop;
+    // v0.4.52 — selectable animated backgrounds (user: «بک گراند های متحرک بیشتری و اضافه کنی و قابل انتخاب باشن»).
+    // ui.bgKind is the source of truth; ui.liveBg stays in sync for the old Effects toggle.
+    [ObservableProperty] private string _liveBgKind = "particles";
+    public System.Collections.ObjectModel.ObservableCollection<string> LiveBgKinds { get; } = ["off", "particles", "mesh", "orbits", "meteors", "aurora", "rain", "bubbles", "starfield", "fireflies", "grid", "waves", "nebula", "snow", "kaleido"]; // v0.4.56 — «پس زمینه متحرک ۵ تا دیگه»
+    partial void OnLiveBgKindChanged(string value)
+    {
+        try { _s.Set("ui.bgKind", value); _s.Set("ui.liveBg", value == "off" ? "0" : "1"); } catch { }
+        Controls.LiveBackdrop.PushKind(value);
+    }
+    // v0.4.52 — backup results live INSIDE the backup card (user: «بالای صفخه نیاد بنویسه ذخیره شد بیاد و تو تب
+    // بکاپ بنویسه اونو») — the old top StatusMessage banner for backup is gone.
+    [ObservableProperty] private string _backupStatus = "";
+    public bool HasBackupStatus => BackupStatus.Length > 0;
+    partial void OnBackupStatusChanged(string value) => OnPropertyChanged(nameof(HasBackupStatus));
     [ObservableProperty] private string _accent;
     [ObservableProperty] private bool _autoReconnect;
     [ObservableProperty] private bool _killSwitch;
@@ -215,6 +237,7 @@ public sealed partial class SettingsViewModel : PageViewModel
         _language = s.Get("ui.language") ?? "fa";
         _theme2 = Enum.TryParse<AppTheme>(s.Get("ui.theme"), out var t) ? t : AppTheme.Dark;
         _backdrop = Enum.TryParse<Backdrop>(s.Get("ui.backdrop"), out var b) ? b : Backdrop.Mica;
+        _liveBgKind = s.Get("ui.bgKind") ?? (s.Get("ui.liveBg") == "0" ? "off" : "particles"); // v0.4.52
         _accent = s.Get("ui.accent") ?? Accents[0];
         _autoReconnect = s.Get("conn.autoReconnect") != "0";
         _killSwitch = s.Get("conn.killSwitch") == "1";
@@ -233,6 +256,20 @@ public sealed partial class SettingsViewModel : PageViewModel
         _customAccent = _accent;
         LoadCustomPalettes();
         RefreshPaletteBadges(_accent);
+        // v0.4.57 — the beauty batch: restore auto day/night, the accent hue and OLED once at startup
+        try
+        {
+            _autoTheme = _s.Get(ThemeService.AutoKey) == "1";
+            _autoSunrise = double.TryParse(_s.Get(ThemeService.SunriseKey), System.Globalization.CultureInfo.InvariantCulture, out var sr) ? sr : 7;
+            _autoSunset = double.TryParse(_s.Get(ThemeService.SunsetKey), System.Globalization.CultureInfo.InvariantCulture, out var ss) ? ss : 19;
+            _accentHueOn = _s.Get(ThemeService.HueOnKey) == "1";
+            _accentHue = double.TryParse(_s.Get(ThemeService.HueKey), System.Globalization.CultureInfo.InvariantCulture, out var h) ? h : 210;
+            _oled = _s.Get(ThemeService.OledKey) == "1";
+            _theme.SetAutoTheme(_autoTheme, _autoSunrise, _autoSunset);
+            if (_accentHueOn) _theme.SetAccentLive(ThemeService.HueHex(_accentHue));
+            _theme.SetOled(_oled);
+        }
+        catch { }
         RefreshShades(_accent);
         _officialWireGuard = s.Get("wireguard.official") == "1";
         _tunnelIpv6 = s.Get("tunnel.ipv6") == "1";
@@ -240,7 +277,8 @@ public sealed partial class SettingsViewModel : PageViewModel
         // v0.4.15 default mode: WireSock defaults to ON when it is installed (better MTU/obfuscation behaviour).
         // v0.4.30: strict routing defaults ON — only an explicit off ("0") disables it (see AppHost's engine mapping).
         _strictRoute = s.Get("tun.strict") != "0";
-        _connectShape = s.Get("ui.connectShape") == "circle" ? "circle" : "rounded";
+        _connectShape = s.Get("ui.connectShape") is { Length: > 0 } cs && cs is "circle" or "hex" or "shield" or "diamond" ? cs : "rounded";
+        _connectMotion = s.Get("ui.connectMotion") is { Length: > 0 } cm && cm is "breathe" or "pulse" or "orbit" or "none" ? cm : "water"; // v0.4.54
         _useWireSock = s.Get("wireguard.wiresock") is { } ws ? ws == "1" : WireSockInstalled;
         _wireGuardMtu = s.Get("wireguard.mtu") is { Length: > 0 } wm && WireGuardMtus.Contains(wm) ? wm : "1280";
         _tunMtu = s.Get("tun.mtu") is { Length: > 0 } tm && TunMtus.Contains(tm) ? tm : "9000";
@@ -294,7 +332,7 @@ public sealed partial class SettingsViewModel : PageViewModel
     partial void OnConnectShapeChanged(string value)
     {
         _s.Set("ui.connectShape", value);
-        Controls.UiPrefs.Set(value == "circle");
+        Controls.UiPrefs.Set(value, _connectMotion);
     }
 
     partial void OnEffectsChanged(bool value)
@@ -377,6 +415,41 @@ public sealed partial class SettingsViewModel : PageViewModel
         if (!_uiSyncing && value != _theme.Mode) _theme.Apply(value, Accent);
     }
     partial void OnBackdropChanged(Backdrop value) { if (App.Current.MainWindow is { } w) _theme.ApplyBackdrop(w, value); _s.Set("ui.backdrop", value.ToString()); }
+
+    /* ── v0.4.57 — the beauty batch (ideas 1, 2, 5, 6, 8): auto day/night, a free accent hue, OLED pure black,
+       the personal background image and compact density. ── */
+
+    /// <summary>Idea 1: Light between sunrise and sunset, Dark otherwise — checked once a minute.</summary>
+    public bool AutoTheme { get => _autoTheme; set { if (!SetProperty(ref _autoTheme, value)) return; _theme.SetAutoTheme(value, AutoSunrise, AutoSunset); _s.Set(ThemeService.AutoKey, value ? "1" : "0"); } }
+    private bool _autoTheme;
+    public double AutoSunrise { get => _autoSunrise; set { if (!SetProperty(ref _autoSunrise, Math.Clamp(value, 0, 23.99))) return; _theme.SetAutoTheme(AutoTheme, AutoSunrise, AutoSunset); _s.Set(ThemeService.SunriseKey, _autoSunrise.ToString(System.Globalization.CultureInfo.InvariantCulture)); } }
+    private double _autoSunrise = 7;
+    public double AutoSunset { get => _autoSunset; set { if (!SetProperty(ref _autoSunset, Math.Clamp(value, 0, 23.99))) return; _theme.SetAutoTheme(AutoTheme, AutoSunrise, AutoSunset); _s.Set(ThemeService.SunsetKey, _autoSunset.ToString(System.Globalization.CultureInfo.InvariantCulture)); } }
+    private double _autoSunset = 19;
+
+    /// <summary>Idea 2: any hue on the colour wheel as the accent — the derived pair (accent2, soft, gradient,
+    /// aurora…) regenerates live via <see cref="ThemeService.SetAccentLive"/>.</summary>
+    public bool AccentHueOn { get => _accentHueOn; set { if (!SetProperty(ref _accentHueOn, value)) return; _s.Set(ThemeService.HueOnKey, value ? "1" : "0"); if (value) _theme.SetAccentLive(ThemeService.HueHex(AccentHue)); else _theme.Apply(Theme2, _accent); } }
+    private bool _accentHueOn;
+    public double AccentHue { get => _accentHue; set { if (!SetProperty(ref _accentHue, value)) return; _s.Set(ThemeService.HueKey, value.ToString(System.Globalization.CultureInfo.InvariantCulture)); if (AccentHueOn) _theme.SetAccentLive(ThemeService.HueHex(value)); } }
+    private double _accentHue = 210;
+
+    /// <summary>Idea 5: OLED pure black. Toggling off reloads the theme dictionary so the original surfaces return.</summary>
+    public bool Oled { get => _oled; set { if (!SetProperty(ref _oled, value)) return; _s.Set(ThemeService.OledKey, value ? "1" : "0"); _theme.SetOled(value); if (!value) _theme.Apply(Theme2, Accent); } }
+    private bool _oled;
+
+    /// <summary>Idea 8: compact density lives on the shell (it scales the page host); proxied here for the toggle.</summary>
+    public bool Compact { get => AppHost.Get<MainViewModel>().Compact; set { AppHost.Get<MainViewModel>().Compact = value; OnPropertyChanged(); } }
+
+    /// <summary>Idea 6: pick a personal background image — blurred and dimmed behind everything.</summary>
+    [RelayCommand] private void PickBgImage()
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp;*.webp" };
+        if (dlg.ShowDialog() != true) return;
+        AppHost.Get<MainViewModel>().LoadBgImage(dlg.FileName);
+        _s.Set("ui.bgImage", dlg.FileName);
+    }
+    [RelayCommand] private void ClearBgImage() { AppHost.Get<MainViewModel>().ClearBgImage(); _s.Set("ui.bgImage", ""); }
     partial void OnAccentChanged(string value)
     {
         StopRgb(); // v0.4.37: picking any colour (swatch, shade, die, hex box) ends the ARGB cycle
@@ -705,46 +778,74 @@ public sealed partial class SettingsViewModel : PageViewModel
     private Koalix.Infrastructure.BackupService Backup => AppHost.Get<Koalix.Infrastructure.BackupService>();
     private bool TunnelActive => AppHost.Get<Koalix.Tunneling.ConnectionManager>().Active is not null;
 
+    /// <summary>v0.4.50 — the tunnel gate used to be a silent StatusMessage nobody ever saw (the «کار نمیکنه»
+    /// report): the backup/restore buttons LOOKED dead while a tunnel was up. Now it ASKS, with the disconnect
+    /// action right inside the dialog, and continues automatically once the tunnel is down.</summary>
+    private async Task<bool> EnsureTunnelDisconnected()
+    {
+        if (!TunnelActive) return true;
+        if (!Dialogs.ConfirmCustom(L["Backup.Disconnect.Title"], L["Backup.Disconnect.Msg"], L["Backup.Disconnect.Now"], L["Common.Cancel"], dangerous: true)) return false;
+        IsBusy = true;
+        try { await AppHost.Get<Koalix.Tunneling.ConnectionManager>().DisconnectAsync(CancellationToken.None); }
+        finally { IsBusy = false; }
+        return true;
+    }
+
     [RelayCommand]
     private async Task BackupAsync()
     {
-        if (TunnelActive) { StatusMessage = L["Backup.DisconnectFirst"]; return; }
-        var pw = Dialogs.Prompt(L["Backup.Title"], L["Backup.PasswordPrompt"], password: true);
-        if (string.IsNullOrWhiteSpace(pw)) return;
-        var pw2 = Dialogs.Prompt(L["Backup.Title"], L["Backup.PasswordRepeat"], password: true);
-        if (pw2 is null || pw2 != pw) { StatusMessage = L["Backup.PasswordMismatch"]; return; }
+        if (!await EnsureTunnelDisconnected()) return;
+        // v0.4.50 («یک قابلیت بدون رمز هم بزار») — an EMPTY password now means the passwordless «بدون رمز» file.
+        // v0.4.52 — «موقع گرفتن بکاپ ازم بپرسه چه چیزایی تو فایل ذخیره شه»: the picker decides what the file
+        // carries — settings on by default; profiles/subscriptions/split-tunnel rules/DNS off; logs never.
+        var scope = Controls.BackupScopeDialog.Show();
+        if (scope is null) return;
+        var pw = Dialogs.Prompt(L["Backup.Title"], L["Backup.PasswordOrEmpty"], password: true);
+        if (pw is null) return;
+        string? pwUse = pw.Trim().Length == 0 ? null : pw;
+        if (pwUse is not null)
+        {
+            var pw2 = Dialogs.Prompt(L["Backup.Title"], L["Backup.PasswordRepeat"], password: true);
+            if (pw2 is null || pw2 != pwUse) { BackupStatus = L["Backup.PasswordMismatch"]; return; }
+        }
         var file = Dialogs.SaveFile("KOALIX backup (*.koalixbak)|*.koalixbak", $"koalix-backup-{DateTime.Now:yyyyMMdd-HHmm}.koalixbak");
         if (file is null) return;
         IsBusy = true;
         try
         {
-            await Task.Run(() => Backup.Export(file, pw));
-            StatusMessage = L.Format("Backup.Done", file);
+            await Task.Run(() => Backup.Export(file, pwUse, scope)); // v0.4.52 — the picked sections only
+            BackupStatus = L.Format("Backup.Done", file); // inside the card, not the top banner
             Toasts.Show(L["Backup.Title"], L["Backup.DoneToast"], ToastKind.Success);
         }
-        catch (Exception ex) { StatusMessage = L["Common.Error"] + ": " + Redactor.Redact(ex.Message); }
+        catch (Exception ex) { BackupStatus = L["Common.Error"] + ": " + Redactor.Redact(ex.Message); }
         finally { IsBusy = false; }
     }
 
     [RelayCommand]
     private async Task RestoreAsync()
     {
-        if (TunnelActive) { StatusMessage = L["Backup.DisconnectFirst"]; return; }
+        if (!await EnsureTunnelDisconnected()) return;
         var file = Dialogs.OpenFile("KOALIX backup (*.koalixbak)|*.koalixbak|All|*.*");
         if (file is null) return;
-        var pw = Dialogs.Prompt(L["Backup.Title"], L["Backup.PasswordOpen"], password: true);
-        if (string.IsNullOrWhiteSpace(pw)) return;
+        string? pw = null;
+        if (!Koalix.Infrastructure.BackupService.IsPasswordless(file)) // v0.4.50 — passwordless files skip the prompt
+        {
+            pw = Dialogs.Prompt(L["Backup.Title"], L["Backup.PasswordOpen"], password: true);
+            if (string.IsNullOrWhiteSpace(pw)) return;
+        }
         if (!Dialogs.Confirm(L["Backup.Restore"], L.Format("Backup.ConfirmRestore", file))) return;
         IsBusy = true;
         try
         {
             await Task.Run(() => Backup.Import(file, pw));
-            StatusMessage = L["Backup.Restored"];
+            BackupStatus = L["Backup.Restored"]; // v0.4.52 — inside the card
             Toasts.Show(L["Backup.Title"], L["Backup.Restored"], ToastKind.Success);
             AppHost.Get<ViewModels.ProfilesViewModel>().OnActivated();
+            // v0.4.50 — restore swaps the whole settings table: the running UI keeps old values until a restart.
+            Dialogs.Info(L["Backup.Restore"], L["Backup.RestoreRestart"]);
         }
-        catch (System.Security.Cryptography.CryptographicException) { StatusMessage = L["Backup.WrongPassword"]; }
-        catch (Exception ex) { StatusMessage = L["Common.Error"] + ": " + Redactor.Redact(ex.Message); }
+        catch (System.Security.Cryptography.CryptographicException) { BackupStatus = L["Backup.WrongPassword"]; }
+        catch (Exception ex) { BackupStatus = L["Common.Error"] + ": " + Redactor.Redact(ex.Message); }
         finally { IsBusy = false; }
     }
 

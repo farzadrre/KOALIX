@@ -605,7 +605,7 @@ public sealed partial class ProfilesViewModel : PageViewModel
                     row.VolumeLevel = 1;
                 }
             }
-            if (s.ExpireUnix is { } exp)
+            if (s.ExpireUnix is { } exp && exp > 0) // v0.4.53 — rows synced before the parse fix carry expire=0 (unlimited)
             {
                 var at = DateTimeOffset.FromUnixTimeSeconds(exp).ToLocalTime();
                 var left = at - DateTimeOffset.Now;

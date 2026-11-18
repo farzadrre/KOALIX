@@ -34,6 +34,30 @@ public static class Motion
         if (d is Panel p && (bool)e.NewValue) p.Loaded += EntranceLoaded;
     }
 
+    /// <summary>v0.4.57 — «ورود نرم کارت‌ها»: the same staggered rise for ItemsControl containers (the server
+    /// cards) — the page panels already had it, the generated items did not. Runs once per view instance.</summary>
+    public static readonly DependencyProperty EntranceItemsProperty =
+        DependencyProperty.RegisterAttached("EntranceItems", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnEntranceItemsChanged));
+    public static bool GetEntranceItems(DependencyObject d) => (bool)d.GetValue(EntranceItemsProperty);
+    public static void SetEntranceItems(DependencyObject d, bool v) => d.SetValue(EntranceItemsProperty, v);
+    private static void OnEntranceItemsChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is ItemsControl ic && (bool)e.NewValue) ic.Loaded += ItemsLoaded;
+    }
+    private static void ItemsLoaded(object sender, RoutedEventArgs e)
+    {
+        var ic = (ItemsControl)sender;
+        ic.Loaded -= ItemsLoaded;
+        try
+        {
+            var rows = new System.Collections.Generic.List<FrameworkElement>();
+            for (var i = 0; i < ic.Items.Count; i++)
+                if (ic.ItemContainerGenerator.ContainerFromIndex(i) is FrameworkElement fe) rows.Add(fe);
+            Enter(rows, step: 0.025, fromY: 10, cap: 8); // realized containers only — virtualization keeps the rest hidden
+        }
+        catch { /* motion must never break a page */ }
+    }
+
     private static void EntranceLoaded(object sender, RoutedEventArgs e)
     {
         var p = (Panel)sender;

@@ -29,7 +29,7 @@ public partial class OnboardingView : UserControl
     public OnboardingView()
     {
         InitializeComponent();
-        _builders = [Welcome, Engines, AddConfig, Split, Connect, WidgetStep, GamingStep, LooksStep, ShortcutsStep, Toolbox]; // v0.4.38: +4 steps
+        _builders = [Welcome, Engines, AddConfig, Split, Connect, WidgetStep, GamingStep, LooksStep, ShortcutsStep, TunnelHubStep, Toolbox]; // v0.4.53: steps 10/11 swapped (user request)
         // build the step only when the overlay actually becomes visible — a hidden tour must not animate
         // (Loaded fires for collapsed elements too, and the emblems would run behind the overlay forever).
         IsVisibleChanged += (_, _) =>
@@ -175,6 +175,42 @@ public partial class OnboardingView : UserControl
             st.BeginAnimation(ScaleTransform.ScaleYProperty, pop);
         }
         SwapVisual(grid);
+    }
+
+    // 11 — تونل‌های پیشرفته (v0.4.50): both tunnels on ONE page — WARP blue, Aether violet, side by side
+    private void TunnelHubStep()
+    {
+        SetText("Tour.Step11Title", "Tour.Step11Text");
+        StackPanel PillContent(string glyph, string title, string stateGlyph)
+        {
+            var sp = new StackPanel { Orientation = Orientation.Horizontal };
+            sp.Children.Add(new TextBlock { Text = glyph, FontSize = 15, VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.White });
+            sp.Children.Add(new TextBlock { Text = title, FontSize = 13, FontWeight = FontWeights.Bold, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.White });
+            sp.Children.Add(new TextBlock { Text = stateGlyph, FontSize = 13, Margin = new Thickness(9, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.White });
+            return sp;
+        }
+        var warp = new Border { CornerRadius = new CornerRadius(12), Padding = new Thickness(16, 10, 16, 10), Margin = new Thickness(0, 0, 6, 0), Child = PillContent("\uE71B", Loc.I["Tunnels.Tab.Chain"], "\uE73E") };
+        warp.Background = new LinearGradientBrush(Color.FromRgb(0x1E, 0x6F, 0xD9), Color.FromRgb(0x4C, 0x9A, 0xFF), 45);
+        // v0.4.52 — «لوگوی اتر هم تکراریه عوضش کن»: the tour pill carries the NEW atom logo, not DNS's globe
+        var aetherSp = new StackPanel { Orientation = Orientation.Horizontal };
+        aetherSp.Children.Add(new MotionGlyph { Key = "Aether", Width = 15, Height = 15, IsActive = true, VerticalAlignment = VerticalAlignment.Center });
+        aetherSp.Children.Add(new TextBlock { Text = Loc.I["Tunnels.Tab.Aether"], FontSize = 13, FontWeight = FontWeights.Bold, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.White });
+        aetherSp.Children.Add(new TextBlock { Text = "\uE768", FontSize = 13, Margin = new Thickness(9, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.White });
+        var aether = new Border { CornerRadius = new CornerRadius(12), Padding = new Thickness(16, 10, 16, 10), Margin = new Thickness(6, 0, 0, 0), Child = aetherSp };
+        aether.Background = new LinearGradientBrush(Color.FromRgb(0x6D, 0x28, 0xD9), Color.FromRgb(0xC0, 0x26, 0xD3), 45);
+        var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        row.Children.Add(warp); row.Children.Add(aether);
+        var sp = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        sp.Children.Add(row);
+        if (Fx.Enabled)
+        {
+            // the two pills breathe in opposite phases — the dual selector, alive
+            var wp = new DoubleAnimation(0.82, 1, TimeSpan.FromSeconds(1.4)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } };
+            var ap = new DoubleAnimation(1, 0.82, TimeSpan.FromSeconds(1.4)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } };
+            warp.BeginAnimation(OpacityProperty, wp);
+            aether.BeginAnimation(OpacityProperty, ap);
+        }
+        SwapVisual(sp);
     }
 
     // 4 — تونل‌زنی انتخابی: app chips + a packet gliding into the tunnel mouth

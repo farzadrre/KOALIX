@@ -6,6 +6,8 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using Koalix.Core;
+// ImplicitUsings pulls in System.IO — alias the WPF shape so "Path" stays unambiguous (v0.4.54: the core is a Path now).
+using Path = System.Windows.Shapes.Path;
 
 namespace Koalix.App.Controls;
 
@@ -46,21 +48,20 @@ public sealed class ConnectOrb : UserControl
     private readonly GradientStop _glowStop0 = new(Colors.Transparent, 0.28);
     private readonly GradientStop _glowStop1 = new(Colors.Transparent, 1.0);
 
-    private readonly Rectangle _ring1 = Ring(), _ring2 = Ring();     // expanding pulse rings
-    private readonly Rectangle _track = new()
-    {
-        Width = TrackSize, Height = TrackSize, RadiusX = TrackRadius, RadiusY = TrackRadius, StrokeThickness = 3, IsHitTestVisible = false,
-    };
-    private readonly Rectangle _arc;                                 // dash spinner (clockwise)
-    private readonly Rectangle _arc2;                                // short dash spinner (counter-clockwise)
+    // v0.4.54 — «شکل دکمه اتصال هم چند مدل کن»: every silhouette is a Path now, so the whole orb can re-dress
+    // itself as a rounded square, a circle, a hexagon, a shield or a diamond (UiPrefs.Shape).
+    private readonly Path _ring1 = RingPath(), _ring2 = RingPath();  // expanding pulse rings
+    private readonly Path _track = new() { StrokeThickness = 3, IsHitTestVisible = false };
+    private readonly Path _arc;                                      // dash spinner (clockwise)
+    private readonly Path _arc2;                                     // short dash spinner (counter-clockwise)
     /// <summary>One-shot success/disconnect shockwave: expands or implodes around the core.</summary>
-    private readonly Rectangle _burst = new()
+    private readonly Path _burst = new()
     {
-        Width = CoreSize, Height = CoreSize, RadiusX = CoreRadius, RadiusY = CoreRadius, StrokeThickness = 3,
+        StrokeThickness = 3,
         IsHitTestVisible = false, Opacity = 0, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1),
     };
 
-    private readonly Border _core = new() { Width = CoreSize, Height = CoreSize, CornerRadius = new CornerRadius(CoreRadius), BorderThickness = new Thickness(1.8) };
+    private readonly Path _corePath = new() { StrokeThickness = 1.8 };
     private readonly GradientStop _coreStop0 = new(Color.FromRgb(0x1B, 0x1F, 0x32), 0.0);
     private readonly GradientStop _coreStop1 = new(Color.FromRgb(0x14, 0x17, 0x26), 0.55);
     private readonly GradientStop _coreStop2 = new(Color.FromRgb(0x10, 0x13, 0x20), 1.0);
@@ -85,6 +86,17 @@ public sealed class ConnectOrb : UserControl
     private bool _waveTicking;
 
     private readonly Border _shine = new() { Width = CoreSize - 6, Height = CoreSize - 6, CornerRadius = new CornerRadius(CoreRadius - 4), IsHitTestVisible = false };
+    // v0.4.54 — the «orbit» motion riders
+    private Canvas _orbitHost = null!;
+    private Ellipse _orbitA = null!, _orbitB = null!;
+    // v0.4.56 — «انیمیشن دکمه اتصال بیشتر بیار 5 تا دیگه خلاقیتت بیشتر باشه»: heartbeat / tide / storm / galaxy /
+    // vortex join water, breathe, pulse and orbit. Galaxy adds eight star riders; storm adds a lightning bolt;
+    // vortex spins the liquid (a RotateTransform on the wave host); the label can be shifted per shape.
+    private readonly Ellipse[] _galaxy = new Ellipse[8];
+    private readonly Path _storm = new() { IsHitTestVisible = false, Opacity = 0, StrokeThickness = 2 };
+    private readonly RotateTransform _waveSpin = new();
+    private readonly TranslateTransform _contentShift = new();
+    private double _stormNext, _stormGlow;
     private readonly TextBlock _icon = new() { Text = "\uE7E8", FontSize = 40, HorizontalAlignment = HorizontalAlignment.Center, TextWrapping = TextWrapping.NoWrap };
     /// <summary>Brief checkmark/cross overlay right after connecting or disconnecting.</summary>
     private readonly TextBlock _flash = new() { Text = "\uE73E", FontSize = 40, HorizontalAlignment = HorizontalAlignment.Center, Opacity = 0, TextWrapping = TextWrapping.NoWrap };
@@ -93,10 +105,76 @@ public sealed class ConnectOrb : UserControl
     private readonly Grid _coreHost;
     private ConnectionState _last = ConnectionState.Disconnected;
 
-    private static Rectangle Ring() => new()
+    private static Path RingPath() => new()
     {
-        Width = CoreSize, Height = CoreSize, RadiusX = CoreRadius, RadiusY = CoreRadius, StrokeThickness = 2,
+        StrokeThickness = 2,
         IsHitTestVisible = false, Opacity = 0, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1),
+    };
+
+    /// <summary>v0.4.54 — the five selectable silhouettes (rounded square, circle, hexagon, shield, diamond),
+    /// each drawn inside a size×size box.</summary>
+    private static Geometry ShapeGeo(string kind, double size, double radius)
+    {
+        Geometry g = kind switch
+        {
+            "circle" => new EllipseGeometry(new Point(size / 2, size / 2), size / 2, size / 2),
+            "hex" => PolyGeo(6, size, -Math.PI / 2),
+            "diamond" => PolyGeo(4, size, -Math.PI / 2),
+            "shield" => ShieldGeo(size),
+            _ => new RectangleGeometry(new Rect(0, 0, size, size), radius, radius),
+        };
+        g.Freeze();
+        return g;
+    }
+
+    private static Geometry PolyGeo(int n, double size, double start)
+    {
+        var g = new StreamGeometry();
+        using (var ctx = g.Open())
+        {
+            var R = size / 2;
+            ctx.BeginFigure(new Point(size / 2 + R * Math.Cos(start), size / 2 + R * Math.Sin(start)), true, true);
+            for (var i = 1; i < n; i++)
+            {
+                var a = start + i * 2 * Math.PI / n;
+                ctx.LineTo(new Point(size / 2 + R * Math.Cos(a), size / 2 + R * Math.Sin(a)), true, true);
+            }
+        }
+        g.Freeze();
+        return g;
+    }
+
+    private static Geometry ShieldGeo(double size)
+    {
+        // v0.4.55 — «شکل سپر که میزنم میرم تو داشبورد همه چیز ناپدید میشه»: the shield was the ONLY shape built
+        // through the string mini-language parser + a Transform on the geometry itself — on the user's machine navigating to the
+        // dashboard with it blanked the whole page. It is now built the same way as the hexagon/diamond that
+        // always worked: a StreamGeometryContext drawing directly at the final size, no parsing, no transform.
+        var u = size / 100.0;
+        static Point P(double x, double y, double u) => new(x * u, y * u);
+        var g = new StreamGeometry();
+        using (var ctx = g.Open())
+        {
+            ctx.BeginFigure(P(50, 3, u), true, true);
+            ctx.BezierTo(P(72, 10, u), P(92, 14, u), P(92, 30, u), true, true);   // right shoulder
+            ctx.LineTo(P(92, 56, u), true, true);                     // right side
+            ctx.BezierTo(P(92, 80, u), P(74, 93, u), P(50, 98, u), true, true);   // right taper → bottom point
+            ctx.BezierTo(P(26, 93, u), P(8, 80, u), P(8, 56, u), true, true);     // left taper
+            ctx.LineTo(P(8, 30, u), true, true);                      // left side
+            ctx.BezierTo(P(8, 14, u), P(28, 10, u), P(50, 3, u), true, true);     // left shoulder → close
+        }
+        g.Freeze();
+        return g;
+    }
+
+    /// <summary>Approximate outline length — enough to keep the dash rhythm even across the shapes.</summary>
+    private static double ShapePerimeter(string kind, double size, double radius) => kind switch
+    {
+        "circle" => Math.PI * size,
+        "hex" => 3 * size,
+        "diamond" => 4 * (size / Math.Sqrt(2)),
+        "shield" => 3.1 * size,
+        _ => 4 * (size - 2 * radius) + 2 * Math.PI * radius,
     };
 
     public ConnectOrb()
@@ -121,16 +199,16 @@ public sealed class ConnectOrb : UserControl
         };
 
         double arcDash = 0.30 * TrackPerimeter / ArcThickness, arcGap = (TrackPerimeter - arcDash * ArcThickness) / ArcThickness;
-        _arc = new Rectangle
+        _arc = new Path
         {
-            Width = TrackSize, Height = TrackSize, RadiusX = TrackRadius, RadiusY = TrackRadius, StrokeThickness = ArcThickness,
+            StrokeThickness = ArcThickness,
             StrokeDashArray = new DoubleCollection { arcDash, arcGap }, StrokeDashCap = PenLineCap.Round, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
             IsHitTestVisible = false, Opacity = 0,
         };
         double arc2Dash = 0.12 * TrackPerimeter / Arc2Thickness, arc2Gap = (TrackPerimeter - arc2Dash * Arc2Thickness) / Arc2Thickness;
-        _arc2 = new Rectangle
+        _arc2 = new Path
         {
-            Width = TrackSize, Height = TrackSize, RadiusX = TrackRadius, RadiusY = TrackRadius, StrokeThickness = Arc2Thickness,
+            StrokeThickness = Arc2Thickness,
             StrokeDashArray = new DoubleCollection { arc2Dash, arc2Gap }, StrokeDashCap = PenLineCap.Round, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
             IsHitTestVisible = false, Opacity = 0,
         };
@@ -143,12 +221,12 @@ public sealed class ConnectOrb : UserControl
         coreBg.GradientStops.Add(_coreStop0);
         coreBg.GradientStops.Add(_coreStop1);
         coreBg.GradientStops.Add(_coreStop2);
-        _core.Background = coreBg;
+        _corePath.Fill = coreBg;
 
         var coreBorder = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 1) };
         coreBorder.GradientStops.Add(_borderStop0);
         coreBorder.GradientStops.Add(_borderStop1);
-        _core.BorderBrush = coreBorder;
+        _corePath.Stroke = coreBorder;
 
         _ring1.Stroke = _ring2.Stroke = _ringBrush;
         _icon.Foreground = _iconBrush;
@@ -170,11 +248,32 @@ public sealed class ConnectOrb : UserControl
         _waveClipHost.Clip = _waveClipGeo;
         _waveClipHost.Children.Add(_waveBack);
         _waveClipHost.Children.Add(_waveFront);
+        // v0.4.54 — the «orbit» motion: two riders circling inside the core (visible only in that mode)
+        _orbitHost = new Canvas { Width = CoreSize - 4, Height = CoreSize - 4, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+        _orbitA = new Ellipse { Width = 7, Height = 7, Fill = _waveCrestBrush };
+        _orbitB = new Ellipse { Width = 5, Height = 5, Fill = _iconBrush };
+        _orbitHost.Children.Add(_orbitA);
+        _orbitHost.Children.Add(_orbitB);
+        _waveClipHost.Children.Add(_orbitHost);
+        // v0.4.56 — the «galaxy» motion: eight more tiny stars join the two riders
+        for (var i = 0; i < _galaxy.Length; i++)
+        {
+            var s = new Ellipse { Width = i % 2 == 0 ? 4.5 : 3, Height = i % 2 == 0 ? 4.5 : 3, Fill = i % 3 == 0 ? _iconBrush : _waveCrestBrush, Opacity = 0 };
+            _galaxy[i] = s;
+            _orbitHost.Children.Add(s);
+        }
+        // v0.4.56 — the «storm» motion: a jagged bolt flashes across the core
+        _storm.Stroke = _waveCrestBrush;
+        _waveClipHost.Children.Add(_storm);
+        // v0.4.56 — the «vortex» motion spins the whole liquid inside the clipped core
+        _waveClipHost.RenderTransformOrigin = new Point(0.5, 0.5);
+        _waveClipHost.RenderTransform = _waveSpin;
 
         var iconHost = new Grid();
         iconHost.Children.Add(_icon); iconHost.Children.Add(_flash);
         _flash.Foreground = Brushes.White;
         var content = new StackPanel { VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+        content.RenderTransform = _contentShift; // v0.4.56 — «نوشته وسط سپر نیست»: the shield's visual centre sits above the box centre
         content.Children.Add(iconHost); content.Children.Add(_label);
 
         _shine.Background = new LinearGradientBrush(Color.FromArgb(0x24, 255, 255, 255), Color.FromArgb(0, 255, 255, 255), 90);
@@ -182,10 +281,9 @@ public sealed class ConnectOrb : UserControl
         contentHost.Children.Add(_waveClipHost);
         contentHost.Children.Add(_shine);
         contentHost.Children.Add(content);
-        _core.Child = contentHost;
 
         _coreHost = new Grid { Width = CoreSize, Height = CoreSize, Cursor = Cursors.Hand, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = _coreScale, Background = Brushes.Transparent };
-        _coreHost.Children.Add(_core);
+        _coreHost.Children.Add(contentHost);
         _coreHost.MouseEnter += (_, _) => ScaleCore(1.045);
         _coreHost.MouseLeave += (_, _) => ScaleCore(1);
         _coreHost.MouseLeftButtonDown += (_, e) => { ScaleCore(0.95); e.Handled = true; };
@@ -197,7 +295,7 @@ public sealed class ConnectOrb : UserControl
         };
 
         var root = new Grid();
-        foreach (var el in new UIElement[] { _glow, _ring1, _ring2, _track, _arc, _arc2, _coreHost, _burst }) root.Children.Add(el);
+        foreach (var el in new UIElement[] { _glow, _ring1, _ring2, _track, _arc, _arc2, _corePath, _coreHost, _burst }) root.Children.Add(el);
         foreach (FrameworkElement el in root.Children) { el.HorizontalAlignment = HorizontalAlignment.Center; el.VerticalAlignment = VerticalAlignment.Center; }
         Content = root;
         FlowDirection = FlowDirection.LeftToRight;
@@ -223,15 +321,36 @@ public sealed class ConnectOrb : UserControl
 
     private void ApplyShape()
     {
+        // v0.4.55 — failure-proof: a glitch in ANY silhouette must never take the dashboard down again; it falls
+        // back to the classic rounded square instead (the MotionGlyph Build pattern).
+        try
+        {
+            ApplyShapeCore();
+        }
+        catch
+        {
+            UiPrefs.Set("rounded", UiPrefs.Motion);
+            try { ApplyShapeCore(); } catch { /* never */ }
+        }
+    }
+
+    private void ApplyShapeCore()
+    {
+        var kind = UiPrefs.Shape;
+        _contentShift.Y = kind == "shield" ? -22 : 0; // v0.4.57 — «متن اتصال بازم وسط سپر نیست»: -11 was not enough, the label read ~70% down; the icon+label group now sits on the visual centre
         double coreR = CurrentCoreRadius, trackR = CurrentTrackRadius;
-        _core.CornerRadius = new CornerRadius(coreR);
+        _corePath.Data = ShapeGeo(kind, CoreSize, coreR);
+        _burst.Data = ShapeGeo(kind, CoreSize, coreR);
+        _ring1.Data = _ring2.Data = ShapeGeo(kind, CoreSize, coreR);
+        _track.Data = _arc.Data = _arc2.Data = ShapeGeo(kind, TrackSize, trackR);
+        // the glass shine only reads on the radius shapes
+        _shine.Visibility = kind is "rounded" or "circle" ? Visibility.Visible : Visibility.Collapsed;
         _shine.CornerRadius = new CornerRadius(Math.Max(0, coreR - 4));
         _waveClipGeo.RadiusX = _waveClipGeo.RadiusY = Math.Max(0, coreR - 2);
-        _burst.RadiusX = _burst.RadiusY = coreR;
-        _ring1.RadiusX = _ring1.RadiusY = _ring2.RadiusX = _ring2.RadiusY = coreR;
-        _track.RadiusX = _track.RadiusY = trackR;
-        _arc.RadiusX = _arc.RadiusY = _arc2.RadiusX = _arc2.RadiusY = trackR;
-        double per = TrackPerimeter;
+        _waveClipHost.Clip = kind is "rounded" or "circle"
+            ? _waveClipGeo
+            : ShapeGeo(kind, CoreSize - 4, Math.Max(0, coreR - 2));
+        double per = ShapePerimeter(kind, TrackSize, trackR);
         double arcDash = 0.30 * per / ArcThickness, arcGap = (per - arcDash * ArcThickness) / ArcThickness;
         _arc.StrokeDashArray = new DoubleCollection { arcDash, arcGap };
         double arc2Dash = 0.12 * per / Arc2Thickness, arc2Gap = (per - arc2Dash * Arc2Thickness) / Arc2Thickness;
@@ -469,9 +588,32 @@ public sealed class ConnectOrb : UserControl
             if (_flash.Opacity > 0) { _flash.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(1))); _icon.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(1))); }
             _coreScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
             _coreScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            // v0.4.54 — the «breathe» flavour: the whole core slowly swells while connected
+            if (animate && State is ConnectionState.Connected or ConnectionState.Degraded && UiPrefs.Motion == "breathe")
+            {
+                var br = new DoubleAnimation(1, 1.035, TimeSpan.FromSeconds(2.6)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase() };
+                Timeline.SetDesiredFrameRate(br, 30);
+                _coreScale.BeginAnimation(ScaleTransform.ScaleXProperty, br);
+                _coreScale.BeginAnimation(ScaleTransform.ScaleYProperty, br);
+            }
+            else if (animate && State is ConnectionState.Connected or ConnectionState.Degraded && UiPrefs.Motion == "heartbeat")
+            {
+                // v0.4.56 — «ضربان قلب»: the lub-dub — two quick swells, then a rest, repeating
+                var hb = new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromSeconds(1.35) };
+                hb.KeyFrames.Add(new LinearDoubleKeyFrame(1, TimeSpan.Zero));
+                hb.KeyFrames.Add(new SplineDoubleKeyFrame(1.055, TimeSpan.FromMilliseconds(140), new KeySpline(0.4, 0, 0.6, 1)));
+                hb.KeyFrames.Add(new SplineDoubleKeyFrame(1, TimeSpan.FromMilliseconds(260), new KeySpline(0.4, 0, 0.6, 1)));
+                hb.KeyFrames.Add(new SplineDoubleKeyFrame(1.10, TimeSpan.FromMilliseconds(430), new KeySpline(0.4, 0, 0.6, 1)));
+                hb.KeyFrames.Add(new SplineDoubleKeyFrame(1, TimeSpan.FromMilliseconds(800), new KeySpline(0.4, 0, 0.6, 1)));
+                Timeline.SetDesiredFrameRate(hb, 40);
+                _coreScale.BeginAnimation(ScaleTransform.ScaleXProperty, hb);
+                _coreScale.BeginAnimation(ScaleTransform.ScaleYProperty, hb);
+            }
         }
 
-        var period = busy ? 1.3 : State is ConnectionState.Connected or ConnectionState.Degraded ? 2.8 : 0;
+        var period = busy ? 1.3 : State is ConnectionState.Connected or ConnectionState.Degraded
+            ? UiPrefs.Motion switch { "pulse" => 1.5, "heartbeat" => 1.35, "none" => 0, _ => 2.8 } // v0.4.56 — heartbeat rings ride the lub-dub
+            : 0;
         Pulse(_ring1, animate ? period : 0, 0);
         Pulse(_ring2, animate ? period : 0, period / 2);
         if (animate && !idle)
@@ -483,7 +625,28 @@ public sealed class ConnectOrb : UserControl
 
     private void UpdateWaveLoop()
     {
-        var shouldRun = IsLoaded && IsVisible && Fx.Enabled && State is ConnectionState.Connected or ConnectionState.Connecting or ConnectionState.Reconnecting or ConnectionState.Degraded;
+        // v0.4.54 — «داخلش انیمیشن و متحرک بودنش هم چن مدل بکن بشه انتخاب کرد»: water/orbit run the frame loop;
+        // breathe/pulse/none ride the state animations instead and keep the liquid hidden.
+        var liquid = UiPrefs.Motion is "water" or "tide" or "storm" or "vortex"; // v0.4.56 — +3 liquid motions; galaxy rides the orbit loop below
+        var shouldRun = liquid && IsLoaded && IsVisible && Fx.Enabled && State is ConnectionState.Connected or ConnectionState.Connecting or ConnectionState.Reconnecting or ConnectionState.Degraded;
+        _waveBack.Visibility = _waveFront.Visibility = liquid ? Visibility.Visible : Visibility.Collapsed;
+        _orbitHost.Visibility = UiPrefs.Motion is "orbit" or "galaxy" ? Visibility.Visible : Visibility.Collapsed;
+        var galaxyM = UiPrefs.Motion == "galaxy";
+        foreach (var s in _galaxy) s.Opacity = galaxyM ? 1 : 0;
+        if (UiPrefs.Motion == "storm" && shouldRun)
+        {
+            _stormNext = 0; _stormGlow = 0; _storm.Opacity = 0; // re-arm the bolt on re-entry
+        }
+        else if (!liquid) _storm.Opacity = 0;
+        // the «vortex» spin: the liquid plane slowly rotates while the frame loop keeps drawing the waves
+        if (UiPrefs.Motion == "vortex" && shouldRun)
+        {
+            var spin = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(7.5)) { RepeatBehavior = RepeatBehavior.Forever };
+            Timeline.SetDesiredFrameRate(spin, 30);
+            _waveSpin.BeginAnimation(RotateTransform.AngleProperty, spin);
+        }
+        else
+            _waveSpin.BeginAnimation(RotateTransform.AngleProperty, null);
         if (shouldRun)
         {
             _waveClipHost.BeginAnimation(OpacityProperty, new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(350)));
@@ -525,11 +688,44 @@ public sealed class ConnectOrb : UserControl
             ConnectionState.Connecting or ConnectionState.Reconnecting => 0.25,
             _ => 0.0,
         };
+        if (UiPrefs.Motion == "tide") // v0.4.56 — the level slowly rises and falls like the sea
+            targetFill = Math.Clamp(targetFill + 0.10 * Math.Sin(_wavePhase * 0.35) + 0.05, 0, 0.92);
         _smoothWaveFill += (targetFill - _smoothWaveFill) * 0.12;
 
-        // Advance wave phase faster when download traffic flows
+        // Advance phase faster when download traffic flows (drives the waves — and the orbit riders)
         var speed = 2.4 + _smoothActivity * 4.2;
         _wavePhase += Math.Min(dt, 0.1) * speed;
+
+        if (UiPrefs.Motion == "orbit") // v0.4.54 — two riders circling the core on tilted paths
+        {
+            var cx = (CoreSize - 4) / 2;
+            var r1 = (CoreSize - 4) * 0.36;
+            var r2 = (CoreSize - 4) * 0.24;
+            Canvas.SetLeft(_orbitA, cx + r1 * Math.Cos(_wavePhase) - 3.5);
+            Canvas.SetTop(_orbitA, cx + r1 * Math.Sin(_wavePhase * 1.3) - 3.5);
+            Canvas.SetLeft(_orbitB, cx + r2 * Math.Cos(-_wavePhase * 0.7 + 2.1) - 2.5);
+            Canvas.SetTop(_orbitB, cx + r2 * Math.Sin(-_wavePhase * 0.9 + 2.1) - 2.5);
+            return;
+        }
+
+        if (UiPrefs.Motion == "galaxy") // v0.4.56 — a tiny spiral galaxy: two bright riders + eight stars on tilted orbits
+        {
+            var cx = (CoreSize - 4) / 2;
+            var t = _wavePhase;
+            for (var i = 0; i < _galaxy.Length; i++)
+            {
+                var ri = (CoreSize - 4) * (0.14 + 0.033 * i);
+                var ti = t * (1.7 - 0.13 * i) + i * 0.9;
+                var tilt = 0.55 + 0.05 * i;
+                Canvas.SetLeft(_galaxy[i], cx + ri * Math.Cos(ti) - 2.2);
+                Canvas.SetTop(_galaxy[i], cx + ri * Math.Sin(ti) * Math.Sin(tilt) - 2.2);
+            }
+            Canvas.SetLeft(_orbitA, cx + (CoreSize - 4) * 0.40 * Math.Cos(t * 1.15) - 3.5);
+            Canvas.SetTop(_orbitA, cx + (CoreSize - 4) * 0.40 * Math.Sin(t * 1.15) * 0.62 - 3.5);
+            Canvas.SetLeft(_orbitB, cx + (CoreSize - 4) * 0.27 * Math.Cos(-t * 0.9 + 2.1) - 2.5);
+            Canvas.SetTop(_orbitB, cx + (CoreSize - 4) * 0.27 * Math.Sin(-t * 0.9 + 2.1) * 0.8 - 2.5);
+            return;
+        }
 
         double w = CoreSize - 4, h = CoreSize - 4;
         double baseY = h * (1.0 - _smoothWaveFill);
@@ -538,6 +734,39 @@ public sealed class ConnectOrb : UserControl
 
         _waveBack.Data = BuildSineWaveGeometry(w, h, baseY - 3.0, ampBack, -_wavePhase * 0.82 + 1.4, 1.65);
         _waveFront.Data = BuildSineWaveGeometry(w, h, baseY, ampFront, _wavePhase, 1.35);
+
+        if (UiPrefs.Motion == "storm") // v0.4.56 — a jagged bolt flashes every so often over the waves
+        {
+            if (now >= _stormNext)
+            {
+                _stormNext = now + 0.55 + Random.Shared.NextDouble() * 1.1;
+                _stormGlow = 1;
+                _storm.Data = BuildBoltGeometry(w, h);
+            }
+            _stormGlow = Math.Max(0, _stormGlow - dt * 5.5);
+            _storm.Opacity = _stormGlow;
+        }
+        else if (_storm.Opacity > 0) _storm.Opacity = 0;
+    }
+
+    /// <summary>v0.4.56 — a jagged lightning bolt across the core (the «storm» motion).</summary>
+    private static Geometry BuildBoltGeometry(double w, double h)
+    {
+        var g = new StreamGeometry();
+        var rnd = Random.Shared;
+        using (var ctx = g.Open())
+        {
+            var x = w * (0.30 + rnd.NextDouble() * 0.40);
+            ctx.BeginFigure(new Point(x, -2), true, false);
+            const int n = 6;
+            for (var i = 1; i <= n; i++)
+            {
+                x = Math.Clamp(x + (rnd.NextDouble() - 0.5) * w * 0.34, w * 0.08, w * 0.92);
+                ctx.LineTo(new Point(x, (h + 4) * i / n), true, true);
+            }
+        }
+        g.Freeze();
+        return g;
     }
 
     private static Geometry BuildSineWaveGeometry(double w, double h, double baseY, double amp, double phase, double freq)
@@ -562,7 +791,7 @@ public sealed class ConnectOrb : UserControl
         return geo;
     }
 
-    private static void Pulse(Rectangle ring, double period, double delay)
+    private static void Pulse(Path ring, double period, double delay)
     {
         var st = (ScaleTransform)ring.RenderTransform;
         if (period <= 0)

@@ -122,6 +122,8 @@ public static class AppHost
         s.AddSingleton<Koalix.Aether.AetherService>();
         s.AddSingleton<ViewModels.MainViewModel>();
         s.AddSingleton<ViewModels.DashboardViewModel>();
+        s.AddSingleton<ViewModels.TunnelsHubViewModel>(); // v0.4.50 — the tunnels page
+        s.AddSingleton<ViewModels.TunnelsHubViewModel>(); // v0.4.50 — the tunnels page
         s.AddSingleton<ViewModels.DnsViewModel>();
         s.AddSingleton<ViewModels.ProfilesViewModel>();
         s.AddSingleton<ViewModels.SplitTunnelViewModel>();

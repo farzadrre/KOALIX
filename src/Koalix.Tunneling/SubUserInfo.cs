@@ -34,8 +34,10 @@ public sealed record SubUserInfo
             {
                 case "upload": upload = n; break;
                 case "download": download = n; break;
-                case "total": total = n; break;
-                case "expire": expire = n; break;
+                // v0.4.53 — «لینک ساب هایی که نامحدوده و مینویسه منقضی شده»: panels send total=0 / expire=0 (or a
+                // year-1970 stub) for UNLIMITED accounts — store null instead, so nothing ever shows as expired.
+                case "total": if (n > 0) total = n; break;
+                case "expire": if (n > 0) expire = n; break;
             }
         }
         return sawAny ? new SubUserInfo { UploadBytes = upload, DownloadBytes = download, TotalBytes = total, ExpireUnix = expire } : null;

@@ -113,8 +113,6 @@
           </Border>
           <Image Source="pack://application:,,,/KOALIX;component/Assets/koalix.png" Width="26" Height="26" RenderOptions.BitmapScalingMode="HighQuality"/>
         </Grid>
-        <Button DockPanel.Dock="Right" Style="{StaticResource TrayIconBtn}" Content="&#xE7E8;" Click="OnExit" Margin="5,0,0,0"
-                ToolTip="{l:T Tray.Exit}" Foreground="{DynamicResource DangerBrush}"/>
         <Button DockPanel.Dock="Right" Style="{StaticResource TrayIconBtn}" Content="&#xE8A7;" Click="OnShow" ToolTip="{l:T Tray.Show}"/>
         <Button DockPanel.Dock="Right" Style="{StaticResource TrayIconBtn}" Content="&#xE9D9;" Click="OnWidget" ToolTip="{l:T Tray.Widget}" Margin="0,0,5,0"/>
         <StackPanel VerticalAlignment="Center" Margin="9,0,6,0">
@@ -163,6 +161,33 @@
         </ItemsControl>
       </ScrollViewer>
       <TextBlock x:Name="NoServers" Text="{l:T Tray.NoServers}" Foreground="{DynamicResource SubtleTextBrush}" FontSize="11.5" Margin="3,2" TextWrapping="NoWrap"/>
+
+      <!-- v0.4.50 («دکمه بستن اپ پایین سمت راست باشه — عادت ندارم بالا باشه»): the app's exit moved OUT of the
+           header to the panel's bottom-right corner, where a close button belongs. LTR so the corner is stable. -->
+      <Grid Margin="3,8,3,1" FlowDirection="LeftToRight">
+        <TextBlock Text="{l:T Tray.ExitHint}" Style="{StaticResource Subtle}" FontSize="10.5" VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" Margin="0,0,96,0" TextWrapping="NoWrap"/>
+        <Button HorizontalAlignment="Right" Click="OnExit" Cursor="Hand" Focusable="False" Padding="10,4" ToolTip="{l:T Tray.Exit}">
+          <Button.Template>
+            <ControlTemplate TargetType="Button">
+              <Border x:Name="bd" CornerRadius="8" Padding="{TemplateBinding Padding}" Background="Transparent"
+                      BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}">
+                <ContentPresenter VerticalAlignment="Center"/>
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                  <Setter TargetName="bd" Property="Background" Value="#22E81123"/>
+                  <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource DangerBrush}"/>
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Button.Template>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE7E8;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource DangerBrush}" VerticalAlignment="Center"/>
+            <TextBlock Text="{l:T Tray.Exit}" FontSize="11.5" FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center"/>
+          </StackPanel>
+        </Button>
+      </Grid>
     </StackPanel>
   </Border>
 </Window>

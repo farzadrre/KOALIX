@@ -40,17 +40,113 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _paletteQuery = "";
     public ObservableCollection<PaletteItem> PaletteResults { get; } = [];
     private List<PaletteItem> _paletteAll = [];
+    // ─── v0.4.50 — a tidy sidebar: hide the rows you never use, bring them back whenever («بشه گزینه هارو حذف کرد
+    // تا خلوت تر شه … و بشه برشون گردوند»). Persisted as "ui.nav.hidden"; edit mode lists the hidden rows with a
+    // one-click restore. Dashboard always stays — it is home.
+    [ObservableProperty] private bool _navEditMode;
+    public ObservableCollection<NavItem> HiddenNav { get; } = [];
+    private readonly HashSet<string> _hiddenNavKeys = new();
+    private readonly SettingsRepository _settings;
+    public bool HasHiddenNav => NavEditMode && HiddenNav.Count > 0;
+
+    /* ── v0.4.57 — the beauty batch: compact density (idea 8) scales the page host; the personal background
+       image (idea 6) sits blurred and dimmed behind everything. ── */
+    public bool Compact { get => _compact; set { if (SetProperty(ref _compact, value)) { UiScale = value ? 0.88 : 1.0; try { _settings.Set("ui.compact", value ? "1" : "0"); } catch { } } } }
+    private bool _compact;
+    public double UiScale { get => _uiScale; set => SetProperty(ref _uiScale, value); }
+    private double _uiScale = 1.0;
+    public System.Windows.Media.ImageSource? BgImageSource { get => _bgImageSource; set => SetProperty(ref _bgImageSource, value); }
+    private System.Windows.Media.ImageSource? _bgImageSource;
+    public bool HasBgImage { get => _hasBgImage; set => SetProperty(ref _hasBgImage, value); }
+    private bool _hasBgImage;
+
+    public void LoadBgImage(string path)
+    {
+        try
+        {
+            var bi = new System.Windows.Media.Imaging.BitmapImage();
+            bi.BeginInit();
+            bi.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bi.UriSource = new Uri(path);
+            bi.EndInit();
+            bi.Freeze();
+            BgImageSource = bi;
+            HasBgImage = true;
+        }
+        catch { /* a broken image must never break the shell */ }
+    }
+
+    public void ClearBgImage() { BgImageSource = null; HasBgImage = false; try { _settings.Set("ui.bgImage", ""); } catch { } }
+
+    partial void OnNavEditModeChanged(bool value)
+    {
+        if (value) RefreshHiddenNav();
+        RefreshNavFilter();
+    }
+
+    private void RefreshHiddenNav()
+    {
+        HiddenNav.Clear();
+        foreach (var n in Nav.Where(n => _hiddenNavKeys.Contains(n.Key))) HiddenNav.Add(n);
+        OnPropertyChanged(nameof(HasHiddenNav));
+    }
+
+    private void RefreshNavFilter() => System.Windows.Data.CollectionViewSource.GetDefaultView(Nav).Refresh();
+
+    [RelayCommand]
+    private void ToggleNavEditMode() => NavEditMode = !NavEditMode;
+
+    [RelayCommand]
+    private void HideNavItem(string? key)
+    {
+        if (key is null || key == "Nav.Dashboard" || !_hiddenNavKeys.Add(key)) return;
+        PersistHiddenNav();
+        RefreshHiddenNav();
+        if (Selected?.Key == key) Selected = Nav.FirstOrDefault(n => !_hiddenNavKeys.Contains(n.Key) && UiMode.IsPageVisible(n.Key)) ?? Nav[0];
+        RefreshNavFilter();
+    }
+
+    [RelayCommand]
+    private void RestoreNavItem(string? key)
+    {
+        if (key is null || !_hiddenNavKeys.Remove(key)) return;
+        PersistHiddenNav();
+        RefreshHiddenNav();
+        RefreshNavFilter();
+    }
+
+    private void PersistHiddenNav()
+    {
+        try { _settings.Set("ui.nav.hidden", string.Join(",", _hiddenNavKeys)); } catch { }
+    }
+
+    // v0.4.52 — «میخوام بشه جا به جا هم کرد منورو»: the sidebar drag-reorders in edit mode and the order
+    // persists as "ui.nav.order", restored on the next start (MainWindow drives the drag, the VM owns the data).
+    public void MoveNavItem(int from, int to)
+    {
+        if (from < 0 || to < 0 || from >= Nav.Count || to >= Nav.Count || from == to) return;
+        Nav.Move(from, to);
+        PersistNavOrder();
+    }
+
+    private void PersistNavOrder()
+    {
+        try { _settings.Set("ui.nav.order", string.Join(",", Nav.Select(n => n.Key))); } catch { }
+    }
+
     public Loc L => Loc.I;
 
     public MainViewModel(DashboardViewModel d, DnsViewModel dns, ProfilesViewModel prof, SplitTunnelViewModel split, InspectorViewModel insp,
         PingViewModel ping, RepairViewModel rep, GamingViewModel game, ProxyViewModel proxy, LogsViewModel logs, SettingsViewModel set, AboutViewModel about,
-        GuideViewModel guide, ConnectionManager cm)
+        GuideViewModel guide, ConnectionManager cm, TunnelsHubViewModel hub, SettingsRepository settings)
     {
-        _cm = cm; _dash = d;
+        _cm = cm; _dash = d; _settings = settings;
         Nav =
         [
-            new("Nav.Dashboard", "\uE80F", d), new("Nav.Dns", "\uE968", dns), new("Nav.Profiles", "\uE705", prof),
-            new("Nav.Split", "\uE8AB", split), new("Nav.Inspector", "\uE9D9", insp), new("Nav.Ping", "\uEC05", ping),
+            // v0.4.54 — «روی مدیریت تونل ها میزنم میره توی مدار ها / باید بره توی تونل های انتخابی»: the two
+            // rows swapped VMs — the tunnels row now opens تونل‌های انتخابی, and مدارها rides the other key.
+            new("Nav.Dashboard", "\uE80F", d), new("Nav.TunnelHub", "\uE8AB", split), new("Nav.Dns", "\uE968", dns), new("Nav.Profiles", "\uE705", prof),
+            new("Nav.Split", "\uE8AB", hub), new("Nav.Inspector", "\uE9D9", insp), new("Nav.Ping", "\uEC05", ping),
             new("Nav.Gaming", "\uE7FC", game), new("Nav.Repair", "\uE90F", rep), new("Nav.Proxy", "\uE774", proxy),
             new("Nav.Logs", "\uE9F9", logs), new("Nav.Guide", "\uE897", guide), new("Nav.Settings", "\uE713", set),
             new("Nav.About", "\uE946", about),
@@ -58,7 +154,28 @@ public sealed partial class MainViewModel : ObservableObject
         _selected = Nav[0];
         // v0.4.42 - Beginner / Advanced: the sidebar (the ListBox binds the default view) hides the expert pages in Beginner.
         try { UiMode.I.Load(AppHost.Get<SettingsRepository>()); } catch { }
-        System.Windows.Data.CollectionViewSource.GetDefaultView(Nav).Filter = o => o is NavItem n && UiMode.IsPageVisible(n.Key);
+        try // v0.4.57 — compact density + the personal background image
+        {
+            Compact = settings.Get("ui.compact") == "1";
+            var p = settings.Get("ui.bgImage");
+            if (!string.IsNullOrWhiteSpace(p) && System.IO.File.Exists(p)) LoadBgImage(p);
+        }
+        catch { }
+        // v0.4.50 — restore the user's hidden rows and honour them in the sidebar filter (edit-menu feature)
+        try { foreach (var k in (settings.Get("ui.nav.hidden") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)) if (Nav.Any(n => n.Key == k.Trim())) _hiddenNavKeys.Add(k.Trim()); } catch { }
+        // v0.4.52 — restore the drag-reordered sidebar order ("ui.nav.order"); unknown/new keys stay at the end.
+        try
+        {
+            var order = (settings.Get("ui.nav.order") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(k => k.Trim()).ToList();
+            var idx = 0;
+            foreach (var k in order)
+            {
+                var it = Nav.FirstOrDefault(n => n.Key == k);
+                if (it is not null) Nav.Move(Nav.IndexOf(it), idx++);
+            }
+        }
+        catch { }
+        System.Windows.Data.CollectionViewSource.GetDefaultView(Nav).Filter = o => o is NavItem n && UiMode.IsPageVisible(n.Key) && !_hiddenNavKeys.Contains(n.Key);
         UiMode.I.Changed += OnUiModeChanged;
         cm.StateMachine.Changed += c => App.Current.Dispatcher.BeginInvoke(() => { State = c.To; UpdateText(); SoundService.Play(c.To); });
         Loc.I.LanguageChanged += UpdateText;

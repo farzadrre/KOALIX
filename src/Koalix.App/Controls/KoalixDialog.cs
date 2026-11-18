@@ -48,6 +48,9 @@ public sealed class KoalixDialog : Window
         titleText.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
         titleText.SetResourceReference(TextBlock.FontFamilyProperty, "DisplayFont");
         var body = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, LineHeight = 22 };
+        // v0.4.51 — an LTR message (English exception text) must not re-wrap raggedly under the RTL window
+        // (the period of ".exception" landing at a line start). Non-RTL bodies get LTR direction.
+        if (!HasRtl(message)) body.FlowDirection = FlowDirection.LeftToRight;
         body.SetResourceReference(TextBlock.ForegroundProperty, "SubtleTextBrush");
         var bodyScroll = new ScrollViewer { Content = body, MaxHeight = 320, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 
@@ -71,7 +74,10 @@ public sealed class KoalixDialog : Window
         }
         else ok.IsCancel = true;
 
-        var strip = new Border { Height = 3, CornerRadius = new CornerRadius(2), Margin = new Thickness(-26, -24, -26, 20), Opacity = 0.9 };
+        // v0.4.51 («نوار قرمز از کادر زده بیرون») — the old negative side margins (-26) pushed the strip past the
+        // card's rounded corners with ClipToBounds=false, so its ends stuck OUT of the card. Inset it under the top
+        // padding instead: it now spans the content width, 14px below the top edge, far inside the corner curve.
+        var strip = new Border { Height = 3, CornerRadius = new CornerRadius(2), Margin = new Thickness(0, -10, 0, 18), Opacity = 0.9 };
         strip.SetResourceReference(Border.BackgroundProperty, kind == DialogKind.Error ? "DangerBrush" : kind == DialogKind.Warning ? "WarningBrush" : "AccentGradientBrush");
 
         var content = new StackPanel();
@@ -101,6 +107,16 @@ public sealed class KoalixDialog : Window
     }
 
     private void Close(bool result) { _result = result; DialogResult = result; }
+
+    /// <summary>v0.4.51 — true when the string carries RTL (Arabic/Hebrew block) characters; drives the LTR switch
+    /// for English bodies like exception texts and log paths.</summary>
+    private static bool HasRtl(string s)
+    {
+        foreach (var ch in s)
+            if (ch is >= '\u0590' and <= '\u077F' or >= '\uFB1D' and <= '\uFDFF' or >= '\uFE70' and <= '\uFEFC')
+                return true;
+        return false;
+    }
 
     public static bool Show(string title, string message, DialogKind kind, string primary, string? secondary = null, bool dangerous = false)
     {

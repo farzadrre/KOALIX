@@ -245,7 +245,7 @@ public sealed record SubscriptionInfo(long Id, string Name, string Url, DateTime
 {
     /// <summary>The panel-reported account state (v0.4.20) — used to explain a dead subscription honestly.</summary>
     public bool VolumeExhausted => TotalBytes is > 0 && (UploadBytes ?? 0) + (DownloadBytes ?? 0) >= TotalBytes;
-    public bool Expired => ExpireUnix is { } e && DateTimeOffset.FromUnixTimeSeconds(e).UtcDateTime <= DateTimeOffset.UtcNow.UtcDateTime;
+    public bool Expired => ExpireUnix is { } e && e > 0 && DateTimeOffset.FromUnixTimeSeconds(e).UtcDateTime <= DateTimeOffset.UtcNow.UtcDateTime; // v0.4.53 — 0 = unlimited
 }
 
 /// <summary>

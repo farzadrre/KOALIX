@@ -22,7 +22,8 @@
     <SolidColorBrush x:Key="TextBrush" Color="#FFF2F4FA"/>
     <!-- v0.4.48.2: lifted from #FF9AA3B8 — on the aurora-tinted glass cards the old value measured ~3.6:1
          against the background (WCAG floor is 4.5:1); the hint paragraphs read as black on dark. -->
-    <SolidColorBrush x:Key="SubtleTextBrush" Color="#FFC3CAD9"/>
+    <!-- v0.4.55 — brighter: small texts over translucent cards on a vivid ARGB backdrop used to read muddy -->
+    <SolidColorBrush x:Key="SubtleTextBrush" Color="#FFDCE2EF"/>
     <SolidColorBrush x:Key="DisabledTextBrush" Color="#FF5D6478"/>
     <SolidColorBrush x:Key="InputBrush" Color="#990C0F1A"/>
     <SolidColorBrush x:Key="PopupBrush" Color="#FA141826"/>
