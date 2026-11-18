@@ -200,7 +200,7 @@ public class AetherTests
         return dir!.FullName;
     }
 
-    private static string Src(string relative) => File.ReadAllText(Path.Combine(RepoRoot(), "src", relative));
+    private static string Src(string relative) => File.ReadAllText(Path.Combine(RepoRoot(), "src", relative)).Replace("\r\n", "\n");
     // v0.4.51 — the old inline walk lives in RepoRoot() now so the XAML scanner can reuse it.
 
     /// <summary>The tab strip must drive the two panels through the panel-open flag: closed card = no panel
